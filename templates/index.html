@@ -588,6 +588,9 @@ function renderSidebar() {
         <div class="group-systems ${isOpen ? 'open' : ''}">
           ${sistemas.map(s => `
             <div class="sys-item ${state.currentSistema === s.id ? 'active' : ''}" onclick="loadSistema('${s.id}')">
+              ${SYSTEM_ICONS[s.id]
+                ? `<img src="${sysIconUrl(s.id)}" width="22" height="22" style="flex-shrink:0;object-fit:contain" onerror="this.style.display='none'">`
+                : `<span style="font-size:18px;width:24px;text-align:center;flex-shrink:0">${s.icon}</span>`}
               <span class="sys-label">${s.label}</span>
               ${s.local_count > 0 ? `<span class="sys-count has-items">${s.local_count}</span>` : ''}
             </div>
@@ -828,7 +831,7 @@ function renderGames(d) {
   document.getElementById('content').innerHTML = `
     <div class="content-header">
       ${SYSTEM_ICONS[d.sistema]
-        ? `<img src="${sysIconUrl(d.sistema)}" width="40" height="40" style="object-fit:contain" onerror="this.style.display='none'">`
+        ? `<img src="${sysIconUrl(d.sistema)}" width="64" height="64" style="object-fit:contain" onerror="this.style.display='none'">`
         : `<span style="font-size:24px">${d.icon}</span>`}
       <div>
         <div class="content-title">${d.label}</div>
