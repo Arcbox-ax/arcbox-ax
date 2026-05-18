@@ -126,12 +126,16 @@
 
   /* ── Top 10 home grid ── */
   .top-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
-  .top-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; overflow: hidden; transition: border-color 0.2s, transform 0.2s; }
+  .top-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; overflow: hidden; transition: border-color 0.2s, transform 0.2s; position: relative; }
   .top-card:hover { border-color: var(--accent); transform: translateY(-3px); }
   .top-card-thumb { width: 100%; aspect-ratio: 1/1; object-fit: contain; display: block; background: var(--bg3); padding: 10px; }
   .top-card-icon { width: 100%; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; font-size: 48px; background: var(--bg3); }
   .top-card-label { padding: 8px 10px 2px; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .top-card-count { padding: 0 10px 10px; font-size: 12px; color: var(--accent); font-weight: 700; }
+  .fav-btn { position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.55); border:none; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; z-index:2; padding:0; transition:background 0.15s; }
+  .fav-btn:hover { background:rgba(0,0,0,0.85); }
+  .section-title { font-size:12px; font-weight:700; color:var(--text2); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; }
+  .fav-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 
   /* ── Content header ── */
   .content-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -554,6 +558,7 @@ async function loadSistemas() {
 }
 
 function renderSidebar() {
+  const favIds = getFavorites();
   const el = document.getElementById('sidebarList');
   el.innerHTML = GRUPOS.map(grupo => {
     const sistemas = state.sistemas.filter(s => grupo.sistemas.includes(s.id));
@@ -572,8 +577,10 @@ function renderSidebar() {
         <div class="group-systems ${isOpen ? 'open' : ''}">
           ${sistemas.map(s => `
             <div class="sys-item ${state.currentSistema === s.id ? 'active' : ''}" onclick="loadSistema('${s.id}')">
-              <span class="sys-icon">${s.icon}</span>
+              <img src="/api/thumb/${s.id}/${s.id}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;background:var(--bg2)" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">
+              <span class="sys-icon" style="display:none">${s.icon}</span>
               <span class="sys-label">${s.label}</span>
+              ${favIds.includes(s.id) ? '<span style="font-size:10px;opacity:0.8">⭐</span>' : ''}
               ${s.local_count > 0 ? `<span class="sys-count has-items">${s.local_count}</span>` : ''}
             </div>
           `).join('')}
@@ -589,7 +596,41 @@ function toggleGroup(id) {
   if (!state.currentSistema) renderHome();
 }
 
+function getFavorites() {
+  try { return JSON.parse(localStorage.getItem('arcbox_favorites') || '[]'); }
+  catch { return []; }
+}
+
+function toggleFavorite(id, event) {
+  event.stopPropagation();
+  const favs = getFavorites();
+  const idx = favs.indexOf(id);
+  if (idx >= 0) favs.splice(idx, 1); else favs.push(id);
+  localStorage.setItem('arcbox_favorites', JSON.stringify(favs));
+  if (!state.currentSistema) renderHome();
+  renderSidebar();
+}
+
+function renderTopCard(s, favIds) {
+  const iconUrl = sysIconUrl(s.id);
+  const isFav = favIds.includes(s.id);
+  return `
+    <div class="top-card" onclick="loadSistema('${s.id}')">
+      ${iconUrl
+        ? `<img class="top-card-thumb" src="${iconUrl}"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+               alt="${s.label}">`
+        : ''}
+      <div class="top-card-icon" style="${iconUrl ? 'display:none' : ''}">${s.icon}</div>
+      <button class="fav-btn" onclick="toggleFavorite('${s.id}',event)" title="Favorito">${isFav ? '⭐' : '☆'}</button>
+      <div class="top-card-label">${s.label}</div>
+      <div class="top-card-count">${s.local_count} ROMs</div>
+    </div>`;
+}
+
 function renderHome() {
+  const favIds = getFavorites();
+  const favSystems = favIds.map(id => state.sistemas.find(s => s.id === id)).filter(Boolean);
   const withRoms = state.sistemas
     .filter(s => s.local_count > 0)
     .sort((a, b) => b.local_count - a.local_count)
@@ -605,27 +646,25 @@ function renderHome() {
     return;
   }
 
-  const totalLocal = withRoms.length;
+  const totalLocal = state.sistemas.filter(s => s.local_count > 0).length;
   document.getElementById('content').innerHTML = `
     <div class="home-header">
       <h2>Top sistemas</h2>
       <p>${state.sistemas.length} sistemas · <span style="color:var(--green)">${totalLocal} con descargas</span></p>
     </div>
-    <div class="top-grid">
-      ${withRoms.map(s => {
-        const iconUrl = sysIconUrl(s.id);
-        return `
-        <div class="top-card" onclick="loadSistema('${s.id}')">
-          ${iconUrl
-            ? `<img class="top-card-thumb" src="${iconUrl}"
-                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
-                 alt="${s.label}">`
-            : ''}
-          <div class="top-card-icon" style="${iconUrl ? 'display:none' : ''}">${s.icon}</div>
-          <div class="top-card-label">${s.label}</div>
-          <div class="top-card-count">${s.local_count} ROMs</div>
-        </div>`;
-      }).join('')}
+    ${favSystems.length > 0 ? `
+      <div style="margin-bottom:28px">
+        <div class="section-title">⭐ Favoritos</div>
+        <div class="top-grid fav-grid">
+          ${favSystems.map(s => renderTopCard(s, favIds)).join('')}
+        </div>
+      </div>
+    ` : ''}
+    <div>
+      <div class="section-title">Top sistemas</div>
+      <div class="top-grid">
+        ${withRoms.map(s => renderTopCard(s, favIds)).join('')}
+      </div>
     </div>`;
 }
 
