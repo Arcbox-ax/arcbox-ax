@@ -491,27 +491,24 @@ const GRUPOS = [
 
 // ── System icons (KyleBing/retro-game-console-icons) ─────────────────────────
 const SYSTEM_ICONS = {
-  nes:'fc', fds:'fds', satellaview:'satella', snes:'sfc', n64:'n64',
-  gba:'gba', gb:'gb', gbc:'gbc', nds:'nds', virtualboy:'vb', pokemini:'poke',
-  sg1000:'segasgone', mastersystem:'ms', gamegear:'gg', megadrive:'md',
-  sega32x:'32X', segacd:'segacd', dreamcast:'dc',
-  atari2600:'atari', atari5200:'5200', atari7800:'7800', atari800:'atari800',
-  atarist:'atarist', lynx:'lynx',
-  neogeo:'neogeo', neogeocd:'neocd', ngp:'ngp', ngpc:'ngpc',
-  arcade:'arcade', mame:'mame', fbneo:'arcade',
-  psx:'ps', psp:'psp',
-  c64:'c64', amiga:'amiga', amigacd32:'amiga',
-  pce:'pce', pcecd:'pcecd',
-  odyssey2:'ody', channelf:'fairchild', colecovision:'col',
-  intellivision:'itv', vectrex:'vectrex', supervision:'supervision',
-  wonderswan:'ws',
-  zxspectrum:'zxs', msx1:'msx', msx2:'msx',
-  scummvm:'scummvm', dos:'dos', amstrad:'cpc', x68000:'x68000',
+  'nes': 'FC', 'snes': 'SFC', 'n64': 'N64', 'gba': 'GBA',
+  'gb': 'GB', 'gbc': 'GBC', 'nds': 'NDS', 'virtualboy': 'VB',
+  'gamecube': 'NGC', 'fds': 'FDS', 'pokemini': 'POKEMINI',
+  'satellaview': 'SATELLAVIEW', 'genesis': 'MD', 'megadrive': 'MD',
+  'mastersystem': 'MS', 'gamegear': 'GG', 'saturn': 'SATURN',
+  'segacd': 'SEGACD', 'sega32x': 'SEGA32X', 'sg1000': 'SG1000',
+  'atari2600': 'ATARI2600', 'atari5200': 'ATARI5200',
+  'atari7800': 'ATARI7800', 'atarist': 'ATARIST', 'lynx': 'LYNX',
+  'neogeo': 'NEOGEO', 'neocd': 'NEOCD', 'ngp': 'NGP',
+  'arcade': 'FBNEO', 'fbneo': 'FBNEO', 'mame': 'MAME',
+  'psx': 'PS', 'psp': 'PSP', 'dc': 'DC', 'scummvm': 'SCUMMVM',
+  'c64': 'C64', 'amiga': 'AMIGA', 'msx': 'MSX', 'msx2': 'MSX2',
+  'pce': 'PCE', 'pcecd': 'PCECD', 'pcfx': 'PCFX',
 };
-const ICONS_BASE = 'https://raw.githubusercontent.com/KyleBing/retro-game-console-icons/main/series_miyoo/264w@2x';
+const ICONS_BASE = 'https://raw.githubusercontent.com/KyleBing/retro-game-console-icons/main/series_trimui/300w@1x';
 function sysIconUrl(id) {
   const n = SYSTEM_ICONS[id];
-  return n ? `${ICONS_BASE}/${n}@264.png` : null;
+  return n ? `${ICONS_BASE}/${n}.png` : null;
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -592,7 +589,9 @@ function renderSidebar() {
         <div class="group-systems ${isOpen ? 'open' : ''}">
           ${sistemas.map(s => `
             <div class="sys-item ${state.currentSistema === s.id ? 'active' : ''}" onclick="loadSistema('${s.id}')">
-              <span style="font-size:18px;width:24px;text-align:center;flex-shrink:0">${s.icon}</span>
+              ${SYSTEM_ICONS[s.id]
+                ? `<img src="${sysIconUrl(s.id)}" width="22" height="22" style="flex-shrink:0;object-fit:contain" onerror="this.style.display='none'">`
+                : `<span style="font-size:18px;width:24px;text-align:center;flex-shrink:0">${s.icon}</span>`}
               <span class="sys-label">${s.label}</span>
               ${s.local_count > 0 ? `<span class="sys-count has-items">${s.local_count}</span>` : ''}
             </div>
