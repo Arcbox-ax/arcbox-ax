@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArcBOX-AX</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f13;
+    --bg2: #1a1a22;
+    --bg3: #22222e;
+    --border: #2e2e3e;
+    --accent: #e6a23c;
+    --accent2: #5b8dee;
+    --green: #4ade80;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --text: #e2e2f0;
+    --text2: #8888aa;
+    --radius: 8px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; height: 100vh; display: flex; flex-direction: column; }
+
+  /* ── Header ── */
+  header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; flex-wrap: wrap; }
+  header h1 { font-size: 18px; color: var(--accent); font-weight: 700; letter-spacing: 1px; white-space: nowrap; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); transition: background 0.3s; flex-shrink: 0; }
+  .status-dot.online { background: var(--green); }
+  .status-label { color: var(--text2); font-size: 12px; white-space: nowrap; }
+  .queue-badge { background: var(--accent); color: #000; border-radius: 20px; padding: 2px 8px; font-size: 11px; font-weight: 700; display: none; }
+  .queue-badge.visible { display: inline; }
+  header .spacer { flex: 1; }
+  .header-btn { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 6px 12px; border-radius: var(--radius); cursor: pointer; font-size: 12px; transition: all 0.2s; white-space: nowrap; }
+  .header-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .global-search-wrap { position: relative; flex: 1; min-width: 200px; max-width: 420px; }
+  .global-search { width: 100%; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 7px 36px 7px 12px; border-radius: var(--radius); font-size: 13px; outline: none; transition: border-color 0.2s; }
+  .global-search:focus { border-color: var(--accent); }
+  .global-search-icon { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text2); pointer-events: none; font-size: 14px; }
+  .index-bar { height: 2px; background: var(--bg3); border-radius: 1px; overflow: hidden; display: none; }
+  .index-bar.visible { display: block; }
+  .index-bar-fill { height: 100%; background: var(--accent2); transition: width 0.3s; border-radius: 1px; }
+
+  /* ── Layout ── */
+  .main { display: flex; flex: 1; overflow: hidden; }
+  .sidebar { width: 230px; background: var(--bg2); border-right: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; padding: 6px 0; }
+  .content { flex: 1; overflow-y: auto; padding: 20px; }
+
+  /* ── Sidebar brand groups ── */
+  .sidebar-section { padding: 8px 12px 4px; font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; }
+  .group-block { border-bottom: 1px solid var(--border); }
+  .group-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px 8px 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .group-header:hover { background: var(--bg3); }
+  .group-header.has-active .group-name { color: var(--accent); }
+  .group-logo { width: 46px; height: 26px; flex-shrink: 0; display: flex; align-items: center; }
+  .group-logo svg { width: 100%; height: 100%; }
+  .group-name { flex: 1; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; }
+  .group-badge { font-size: 10px; color: #000; background: var(--accent); padding: 1px 5px; border-radius: 8px; font-weight: 700; }
+  .group-arrow { font-size: 9px; color: var(--text2); transition: transform 0.2s; }
+  .group-arrow.open { transform: rotate(90deg); }
+  .group-systems { display: none; }
+  .group-systems.open { display: block; }
+
+  /* ── Sidebar system items ── */
+  .sys-item { display: flex; align-items: center; gap: 8px; padding: 7px 12px 7px 20px; cursor: pointer; transition: background 0.15s; }
+  .sys-item:hover { background: var(--bg3); }
+  .sys-item.active { background: var(--bg3); border-left: 3px solid var(--accent); padding-left: 17px; }
+  .sys-icon { font-size: 15px; width: 20px; text-align: center; }
+  .sys-label { flex: 1; font-size: 12px; }
+  .sys-count { background: var(--bg); color: var(--text2); font-size: 10px; padding: 1px 5px; border-radius: 10px; }
+  .sys-count.has-items { background: var(--accent); color: #000; font-weight: 700; }
+
+  /* ── Home brand cards ── */
+  .home-header { margin-bottom: 20px; }
+  .home-header h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .home-header p { color: var(--text2); font-size: 13px; }
+  .brand-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .brand-card:hover { border-color: rgba(230,162,60,0.4); }
+  .brand-card-header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .brand-card-logo { width: 70px; height: 38px; flex-shrink: 0; display: flex; align-items: center; }
+  .brand-card-logo svg { width: 100%; height: 100%; }
+  .brand-card-title { font-size: 15px; font-weight: 700; }
+  .brand-card-meta { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .brand-card-arrow { font-size: 11px; color: var(--text2); margin-left: auto; transition: transform 0.2s; }
+  .brand-card-arrow.open { transform: rotate(90deg); }
+  .brand-card-systems { display: none; }
+  .brand-card-systems.open {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+    gap: 8px;
+    padding: 0 14px 14px;
+  }
+  .sys-mini-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s;
+  }
+  .sys-mini-card:hover { border-color: var(--accent2); transform: translateY(-1px); }
+  .sys-mini-name { font-size: 12px; font-weight: 600; line-height: 1.3; }
+  .sys-mini-info { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .sys-mini-badge { display: inline-block; margin-top: 4px; background: #1a3a2a; color: var(--green); font-size: 10px; padding: 1px 5px; border-radius: 6px; font-weight: 600; }
+
+  /* ── Content header ── */
+  .content-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .content-title { font-size: 20px; font-weight: 700; }
+  .content-meta { color: var(--text2); font-size: 13px; }
+  .spacer { flex: 1; }
+  .search-box { background: var(--bg2); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: var(--radius); font-size: 13px; width: 220px; outline: none; }
+  .search-box:focus { border-color: var(--accent2); }
+  .btn { padding: 7px 14px; border-radius: var(--radius); border: none; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.15s; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #f5b856; }
+  .btn-secondary { background: var(--bg3); border: 1px solid var(--border); color: var(--text); }
+  .btn-secondary:hover { border-color: var(--accent2); color: var(--accent2); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+  /* ── Filters ── */
+  .filters { display: flex; gap: 8px; margin-bottom: 14px; }
+  .filter-btn { background: var(--bg2); border: 1px solid var(--border); color: var(--text2); padding: 5px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; transition: all 0.15s; }
+  .filter-btn.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+
+  /* ── Search results ── */
+  .sys-badge { display: inline-flex; align-items: center; gap: 4px; background: var(--bg3); border: 1px solid var(--border); color: var(--text2); font-size: 11px; padding: 2px 8px; border-radius: 10px; white-space: nowrap; font-weight: 600; }
+
+  /* ── Tabla de juegos ── */
+  .games-table { width: 100%; border-collapse: collapse; }
+  .games-table th { text-align: left; padding: 8px 12px; font-size: 11px; text-transform: uppercase; color: var(--text2); letter-spacing: 0.5px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 1; }
+  .games-table td { padding: 7px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .games-table tr:hover td { background: var(--bg2); }
+  .game-name { font-size: 13px; }
+  .game-thumb { width: 36px; height: 36px; object-fit: cover; border-radius: 4px; background: var(--bg3); border: 1px solid var(--border); flex-shrink: 0; }
+  .game-thumb-wrap { width: 36px; height: 36px; background: var(--bg3); border-radius: 4px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--text2); font-size: 16px; flex-shrink: 0; }
+  .thumb-progress { font-size: 11px; color: var(--text2); padding: 4px 0; }
+  .badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: 600; }
+  .badge-local { background: #1a3a2a; color: var(--green); }
+  .badge-xbox  { background: #1a2a3a; color: var(--accent2); }
+  .badge-none  { background: var(--bg3); color: var(--text2); }
+  .size-cell { color: var(--text2); font-size: 12px; white-space: nowrap; }
+  .actions-cell { white-space: nowrap; display: flex; gap: 6px; }
+
+  /* ── Progress row ── */
+  .progress-row td { padding: 4px 12px 10px; }
+  .progress-bar-wrap { background: var(--bg3); border-radius: 4px; height: 6px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; background: var(--accent2); }
+  .progress-bar-fill.uploading { background: var(--accent); }
+  .progress-info { font-size: 11px; color: var(--text2); margin-top: 4px; }
+
+  /* ── Queue panel ── */
+  .queue-panel { position: fixed; right: 0; top: 0; bottom: 0; width: 340px; background: var(--bg2); border-left: 1px solid var(--border); overflow-y: auto; padding: 16px; z-index: 100; transform: translateX(100%); transition: transform 0.25s; }
+  .queue-panel.open { transform: translateX(0); }
+  .queue-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .queue-close { margin-left: auto; cursor: pointer; color: var(--text2); font-size: 18px; }
+  .job-item { background: var(--bg3); border-radius: var(--radius); padding: 10px; margin-bottom: 8px; border: 1px solid var(--border); }
+  .job-name { font-size: 12px; font-weight: 600; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .job-state { font-size: 11px; color: var(--text2); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .job-state span { color: var(--accent); }
+  .job-bar-wrap { background: var(--bg); border-radius: 3px; height: 4px; overflow: hidden; }
+  .job-bar-fill { height: 100%; border-radius: 3px; background: var(--accent2); transition: width 0.3s; }
+  .job-bar-fill.uploading { background: var(--accent); }
+  .job-bar-fill.done { background: var(--green); }
+  .job-bar-fill.error { background: var(--red); }
+
+  /* ── Empty / Loading ── */
+  .empty { text-align: center; padding: 60px 20px; color: var(--text2); }
+  .empty .icon { font-size: 48px; margin-bottom: 12px; }
+  .loading { display: flex; align-items: center; justify-content: center; padding: 60px; gap: 12px; color: var(--text2); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── Hamburger ── */
+  .menu-btn { display: none; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 7px 11px; border-radius: var(--radius); cursor: pointer; font-size: 18px; flex-shrink: 0; line-height: 1; }
+
+  /* ── Sidebar overlay (mobile) ── */
+  .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 149; }
+  .sidebar-overlay.active { display: block; }
+
+  /* ── Mobile ── */
+  @media (max-width: 768px) {
+    header { padding: 8px 12px; gap: 8px; }
+    header h1 svg { width: 64px; height: 29px; }
+    .menu-btn { display: block; }
+    .global-search-wrap { order: 10; flex-basis: 100%; max-width: 100%; }
+    #indexStatus { display: none; }
+    .header-btn { padding: 6px 9px; font-size: 11px; }
+
+    .sidebar {
+      position: fixed; left: 0; top: 0; bottom: 0; z-index: 150;
+      transform: translateX(-100%); transition: transform 0.25s;
+      width: 260px; padding-top: 0;
+    }
+    .sidebar.mob-open { transform: translateX(0); box-shadow: 4px 0 20px rgba(0,0,0,0.5); }
+
+    .main { overflow: visible; }
+    .content { overflow-y: auto; }
+
+    /* Tabla: scroll horizontal, ocultar columna tamaño */
+    .content { padding: 12px; }
+    .games-table { font-size: 12px; }
+    .games-table th:nth-child(3),
+    .games-table td:nth-child(3) { display: none; }
+    .games-table th:nth-child(2),
+    .games-table td:nth-child(2) { display: none; }
+    .actions-cell { gap: 4px; }
+    .btn-sm { padding: 4px 7px; font-size: 11px; }
+
+    .queue-panel { width: 100%; border-left: none; border-top: 1px solid var(--border); top: auto; }
+
+    .brand-card-systems.open { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important; }
+
+    .filters { flex-wrap: wrap; }
+    .content-header { gap: 8px; }
+    .search-box { width: 100%; }
+  }
+
+  @media (max-width: 420px) {
+    .games-table td, .games-table th { padding: 6px 8px; }
+    .brand-card-systems.open { grid-template-columns: 1fr 1fr !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <button class="menu-btn" onclick="toggleSidebar()" aria-label="Menú">☰</button>
+  <h1 style="line-height:1;display:flex;align-items:center">
+    <svg viewBox="0 0 80 36" width="80" height="36" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0.5" y="0.5" width="79" height="35" rx="7" fill="#0f0f13" stroke="#2e2e3e" stroke-width="1"/>
+      <text x="6"  y="21" fill="#8888aa" font-family="'Arial Black',Impact,sans-serif" font-size="15" font-weight="900">Arc</text>
+      <text x="37" y="21" fill="#e6a23c" font-family="'Arial Black',Impact,sans-serif" font-size="15" font-weight="900">BOX</text>
+      <text x="37" y="32" text-anchor="middle" fill="#5b8dee" font-family="'Arial Black',Impact,sans-serif" font-size="9" font-weight="900" letter-spacing="5">AX</text>
+    </svg>
+  </h1>
+  <div class="status-dot" id="xboxDot"></div>
+  <span class="status-label" id="xboxLabel">Conectando...</span>
+  <span class="queue-badge" id="queueBadge">0</span>
+  <div class="global-search-wrap">
+    <input class="global-search" id="globalSearch" type="text" placeholder="🔍 Buscar en todos los sistemas..."
+      oninput="onGlobalSearch(this.value)" onfocus="onGlobalFocus()">
+    <span class="global-search-icon" id="globalSearchIcon">🔍</span>
+  </div>
+  <span id="indexStatus" style="font-size:11px;color:var(--text2);white-space:nowrap"></span>
+  <button class="header-btn" onclick="goHome()">🏠 Sistemas</button>
+  <button class="header-btn" onclick="toggleQueue()">📋 Cola</button>
+</header>
+<div class="index-bar" id="indexBar"><div class="index-bar-fill" id="indexBarFill" style="width:0%"></div></div>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<div class="main">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-section">Sistemas</div>
+    <div id="sidebarList"></div>
+  </div>
+
+  <div class="content" id="content">
+    <div class="loading"><div class="spinner"></div> Cargando...</div>
+  </div>
+</div>
+
+<!-- Queue Panel -->
+<div class="queue-panel" id="queuePanel">
+  <div class="queue-title">
+    📋 Cola de descargas
+    <span class="queue-close" onclick="toggleQueue()">✕</span>
+  </div>
+  <div id="jobList"></div>
+</div>
+
+<script>
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('mob-open');
+  document.getElementById('sidebarOverlay').classList.toggle('active');
+}
+
+// ── Brand groups ──────────────────────────────────────────────────────────────
+const GRUPOS = [
+  {
+    id: 'nintendo',
+    label: 'Nintendo',
+    sistemas: ['nes','fds','satellaview','snes','n64','gamecube','wii','gba','gb','gbc','nds','3ds','virtualboy','pokemini'],
+    logo: `<svg viewBox="0 0 56 32" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="28" cy="16" rx="27" ry="15" fill="#e4000f"/>
+      <text x="28" y="22" text-anchor="middle" fill="white"
+        font-family="'Arial Black',Impact,sans-serif" font-size="20" font-weight="900">N</text>
+    </svg>`
+  },
+  {
+    id: 'sega',
+    label: 'Sega',
+    sistemas: ['sg1000','mastersystem','gamegear','megadrive','sega32x','segacd','saturn','dreamcast','naomi'],
+    logo: `<svg viewBox="0 0 72 32" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="32" rx="16" fill="#1650c8"/>
+      <text x="36" y="22" text-anchor="middle" fill="white"
+        font-family="'Arial Black',Impact,sans-serif" font-size="15" font-weight="900" letter-spacing="2">SEGA</text>
+    </svg>`
+  },
+  {
+    id: 'atari',
+    label: 'Atari',
+    sistemas: ['atari2600','atari5200','atari7800','atari800','atarist','jaguar','lynx'],
+    logo: `<svg viewBox="0 0 56 32" xmlns="http://www.w3.org/2000/svg">
+      <rect width="56" height="32" rx="4" fill="#111"/>
+      <rect x="5"  y="9"  width="11" height="18" rx="3" fill="#f58600"/>
+      <rect x="22" y="4"  width="12" height="24" rx="3" fill="#f58600"/>
+      <rect x="40" y="9"  width="11" height="18" rx="3" fill="#f58600"/>
+    </svg>`
+  },
+  {
+    id: 'snk',
+    label: 'SNK / Neo Geo',
+    sistemas: ['neogeo','neogeocd','ngp','ngpc'],
+    logo: `<svg viewBox="0 0 72 32" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="32" rx="4" fill="#111"/>
+      <rect x="1" y="1" width="70" height="30" rx="3" fill="none" stroke="#c8a400" stroke-width="1.5"/>
+      <text x="36" y="22" text-anchor="middle" fill="#f5c518"
+        font-family="'Arial Black',Impact,sans-serif" font-size="15" font-weight="900" letter-spacing="2">SNK</text>
+    </svg>`
+  },
+  {
+    id: 'arcade',
+    label: 'Arcade',
+    sistemas: ['arcade','mame','fbneo'],
+    logo: `<svg viewBox="0 0 72 32" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="32" rx="4" fill="#1a0a2e"/>
+      <text x="36" y="21" text-anchor="middle" fill="#e879f9"
+        font-family="'Arial Black',Impact,sans-serif" font-size="12" font-weight="900" letter-spacing="1">ARCADE</text>
+      <circle cx="10" cy="16" r="5" fill="#6b21a8" stroke="#a855f7" stroke-width="1.5"/>
+      <circle cx="10" cy="16" r="2" fill="#e879f9"/>
+      <rect x="9" y="7" width="2" height="4" rx="1" fill="#a855f7"/>
+    </svg>`
+  },
+  {
+    id: 'sony',
+    label: 'Sony',
+    sistemas: ['psx','ps2','psp'],
+    logo: `<svg viewBox="0 0 56 32" xmlns="http://www.w3.org/2000/svg">
+      <rect width="56" height="32" rx="4" fill="#003087"/>
+      <text x="10" y="24" fill="white"
+        font-family="Georgia,'Times New Roman',serif" font-size="22" font-weight="900" font-style="italic">PS</text>
+      <text x="40" y="15" fill="#00a3e0"
+        font-family="'Arial Black',Impact,sans-serif" font-size="11" font-weight="900">1</text>
+    </svg>`
+  },
+  {
+    id: 'commodore',
+    label: 'Commodore',
+    sistemas: ['vic20','c64','amiga','amigacd32'],
+    logo: `<svg viewBox="0 0 72 32" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="32" rx="4" fill="#6e4b9e"/>
+      <circle cx="36" cy="16" r="13" fill="none" stroke="white" stroke-width="2.5"/>
+      <text x="36" y="21" text-anchor="middle" fill="white"
+        font-family="'Arial Black',Impact,sans-serif" font-size="14" font-weight="900">CBM</text>
+    </svg>`
+  },
+  {
+    id: 'nec',
+    label: 'NEC',
+    sistemas: ['pce','pcecd'],
+    logo: `<svg viewBox="0 0 72 32" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="32" rx="4" fill="#0038a8"/>
+      <text x="36" y="23" text-anchor="middle" fill="white"
+        font-family="'Arial Black',Impact,sans-serif" font-size="20" font-weight="900" letter-spacing="2">NEC</text>
+    </svg>`
+  },
+  {
+    id: 'pioneros',
+    label: 'Pioneros',
+    sistemas: ['odyssey2','channelf','colecovision','intellivision','vectrex','3do','supervision'],
+    logo: `<svg viewBox="0 0 72 32" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="32" rx="4" fill="#1a1a2e"/>
+      <rect x="4"  y="8"  width="8" height="16" rx="2" fill="#e94560"/>
+      <rect x="16" y="5"  width="8" height="22" rx="2" fill="#e94560" opacity="0.8"/>
+      <rect x="28" y="10" width="8" height="12" rx="2" fill="#e94560" opacity="0.6"/>
+      <text x="54" y="14" text-anchor="middle" fill="#e94560"
+        font-family="'Arial Black',Impact,sans-serif" font-size="8" font-weight="900">PIONEROS</text>
+      <text x="54" y="26" text-anchor="middle" fill="#e94560"
+        font-family="'Arial Black',Impact,sans-serif" font-size="9" font-weight="700">del gaming</text>
+    </svg>`
+  },
+  {
+    id: 'bandai',
+    label: 'Bandai',
+    sistemas: ['wonderswan'],
+    logo: `<svg viewBox="0 0 72 32" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="32" rx="4" fill="#e8380d"/>
+      <text x="36" y="22" text-anchor="middle" fill="white"
+        font-family="'Arial Black',Impact,sans-serif" font-size="13" font-weight="900" letter-spacing="1">BANDAI</text>
+    </svg>`
+  },
+  {
+    id: 'sinclair',
+    label: 'Sinclair',
+    sistemas: ['zxspectrum'],
+    logo: `<svg viewBox="0 0 72 32" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="32" rx="4" fill="#111"/>
+      <text x="14" y="24" fill="white"
+        font-family="'Arial Black',Impact,sans-serif" font-size="22" font-weight="900">ZX</text>
+      <rect x="42" y="5" width="5" height="22" rx="1.5" fill="#cc0000"/>
+      <rect x="49" y="5" width="5" height="22" rx="1.5" fill="#ff8800"/>
+      <rect x="56" y="5" width="5" height="22" rx="1.5" fill="#ffee00"/>
+      <rect x="63" y="5" width="5" height="22" rx="1.5" fill="#44cc00"/>
+    </svg>`
+  },
+  {
+    id: 'msx',
+    label: 'MSX',
+    sistemas: ['msx1','msx2'],
+    logo: `<svg viewBox="0 0 72 32" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="32" rx="4" fill="#cc0000"/>
+      <text x="36" y="23" text-anchor="middle" fill="white"
+        font-family="'Arial Black',Impact,sans-serif" font-size="22" font-weight="900" letter-spacing="2">MSX</text>
+    </svg>`
+  },
+  {
+    id: 'clasicospc',
+    label: 'Clásicos PC',
+    sistemas: ['scummvm','dos','apple2','apple2gs','amstrad','pc98','pcfx','x68000'],
+    logo: `<svg viewBox="0 0 72 32" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="32" rx="4" fill="#1a1200"/>
+      <rect x="4" y="3" width="36" height="22" rx="3" fill="#0d0900" stroke="#8a6a00" stroke-width="1.5"/>
+      <rect x="8"  y="7"  width="18" height="2" rx="1" fill="#d4a017" opacity="0.9"/>
+      <rect x="8"  y="11" width="24" height="2" rx="1" fill="#d4a017" opacity="0.7"/>
+      <rect x="8"  y="15" width="14" height="2" rx="1" fill="#d4a017" opacity="0.5"/>
+      <rect x="8"  y="19" width="8"  height="2" rx="1" fill="#d4a017" opacity="0.9"/>
+      <rect x="17" y="25" width="10" height="2" rx="1" fill="#6a4a00"/>
+      <text x="56" y="13" text-anchor="middle" fill="#d4a017"
+        font-family="'Arial Black',Impact,sans-serif" font-size="8" font-weight="900">CLÁSICOS</text>
+      <text x="56" y="26" text-anchor="middle" fill="#d4a017"
+        font-family="'Arial Black',Impact,sans-serif" font-size="13" font-weight="900">PC</text>
+    </svg>`
+  },
+];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+const state = {
+  sistemas: [],
+  currentSistema: null,
+  games: [],
+  filter: 'all',
+  search: '',
+  jobs: {},
+  xboxOnline: false,
+  openGroups: new Set(['nintendo','sega','atari','snk','arcade','sony','commodore','nec','bandai','sinclair','msx','pioneros','clasicospc']),
+};
+
+// ── SSE ──────────────────────────────────────────────────────────────────────
+const evtSource = new EventSource('/api/events');
+evtSource.addEventListener('progress', e => {
+  const d = JSON.parse(e.data);
+  state.jobs[d.job_id] = d;
+  updateJobUI(d);
+  updateQueueBadge();
+});
+evtSource.addEventListener('done', e => {
+  const d = JSON.parse(e.data);
+  if (state.currentSistema === d.sistema) refreshGames(false);
+  showToast(`✓ ${d.filename.slice(0, 40)}`);
+});
+evtSource.addEventListener('queued', e => {
+  const d = JSON.parse(e.data);
+  state.jobs[d.job_id] = { ...d, state: 'queued', progress: 0 };
+  renderQueue();
+  updateQueueBadge();
+});
+
+// ── Status polling ────────────────────────────────────────────────────────────
+async function pollStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    state.xboxOnline = d.xbox_online;
+    document.getElementById('xboxDot').className = 'status-dot' + (d.xbox_online ? ' online' : '');
+    document.getElementById('xboxLabel').textContent = d.xbox_online ? 'Xbox online' : 'Xbox offline';
+    for (const j of d.jobs) {
+      if (!state.jobs[j.job_id] || state.jobs[j.job_id].progress < j.progress)
+        state.jobs[j.job_id] = j;
+    }
+    updateQueueBadge();
+  } catch {}
+}
+setInterval(pollStatus, 5000);
+pollStatus();
+
+// ── Sistemas ─────────────────────────────────────────────────────────────────
+async function loadSistemas() {
+  const r = await fetch('/api/sistemas');
+  state.sistemas = await r.json();
+  indexTotal = state.sistemas.length;
+  renderSidebar();
+  renderHome();
+}
+
+function renderSidebar() {
+  const el = document.getElementById('sidebarList');
+  el.innerHTML = GRUPOS.map(grupo => {
+    const sistemas = state.sistemas.filter(s => grupo.sistemas.includes(s.id));
+    if (!sistemas.length) return '';
+    const isOpen    = state.openGroups.has(grupo.id);
+    const hasActive = sistemas.some(s => s.id === state.currentSistema);
+    const totalLocal = sistemas.reduce((a, s) => a + s.local_count, 0);
+    return `
+      <div class="group-block">
+        <div class="group-header ${hasActive ? 'has-active' : ''}" onclick="toggleGroup('${grupo.id}')">
+          <span class="group-logo">${grupo.logo}</span>
+          <span class="group-name">${grupo.label}</span>
+          ${totalLocal > 0 ? `<span class="group-badge">${totalLocal}</span>` : ''}
+          <span class="group-arrow ${isOpen ? 'open' : ''}">▶</span>
+        </div>
+        <div class="group-systems ${isOpen ? 'open' : ''}">
+          ${sistemas.map(s => `
+            <div class="sys-item ${state.currentSistema === s.id ? 'active' : ''}" onclick="loadSistema('${s.id}')">
+              <span class="sys-icon">${s.icon}</span>
+              <span class="sys-label">${s.label}</span>
+              ${s.local_count > 0 ? `<span class="sys-count has-items">${s.local_count}</span>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleGroup(id) {
+  if (state.openGroups.has(id)) state.openGroups.delete(id);
+  else state.openGroups.add(id);
+  renderSidebar();
+  if (!state.currentSistema) renderHome();
+}
+
+function renderHome() {
+  const totalLocal = state.sistemas.filter(s => s.local_count > 0).length;
+  document.getElementById('content').innerHTML = `
+    <div class="home-header">
+      <h2>Elige un sistema</h2>
+      <p>${state.sistemas.length} sistemas · <span style="color:var(--green)">${totalLocal} con descargas</span></p>
+    </div>
+    ${GRUPOS.map(grupo => {
+      const sistemas = state.sistemas.filter(s => grupo.sistemas.includes(s.id));
+      if (!sistemas.length) return '';
+      const localCount = sistemas.reduce((a, s) => a + s.local_count, 0);
+      const isOpen = state.openGroups.has(grupo.id);
+      return `
+        <div class="brand-card">
+          <div class="brand-card-header" onclick="toggleGroup('${grupo.id}')">
+            <div class="brand-card-logo">${grupo.logo}</div>
+            <div>
+              <div class="brand-card-title">${grupo.label}</div>
+              <div class="brand-card-meta">${sistemas.length} sistema${sistemas.length !== 1 ? 's' : ''}${localCount > 0 ? ` · <span style="color:var(--green)">${localCount} en local</span>` : ''}</div>
+            </div>
+            <span class="brand-card-arrow ${isOpen ? 'open' : ''}">▶</span>
+          </div>
+          <div class="brand-card-systems ${isOpen ? 'open' : ''}">
+            ${sistemas.map(s => `
+              <div class="sys-mini-card" onclick="loadSistema('${s.id}')">
+                <span style="font-size:22px">${s.icon}</span>
+                <div>
+                  <div class="sys-mini-name">${s.label}</div>
+                  ${s.local_count > 0
+                    ? `<span class="sys-mini-badge">✓ ${s.local_count}</span>`
+                    : `<div class="sys-mini-info">Sin descargas</div>`}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+    }).join('')}`;
+}
+
+function goHome() {
+  state.currentSistema = null;
+  renderSidebar();
+  renderHome();
+}
+
+// ── Juegos ────────────────────────────────────────────────────────────────────
+async function loadSistema(id) {
+  state.currentSistema = id;
+  state.filter = 'all';
+  state.search = '';
+  // Cerrar sidebar en mobile al seleccionar sistema
+  if (window.innerWidth <= 768) {
+    document.getElementById('sidebar').classList.remove('mob-open');
+    document.getElementById('sidebarOverlay').classList.remove('active');
+  }
+  // Auto-expandir grupo padre en sidebar
+  const grupo = GRUPOS.find(g => g.sistemas.includes(id));
+  if (grupo) state.openGroups.add(grupo.id);
+  renderSidebar();
+  document.getElementById('content').innerHTML = '<div class="loading"><div class="spinner"></div> Cargando juegos...</div>';
+  await refreshGames(true);
+}
+
+async function refreshGames(showLoading = false) {
+  const id = state.currentSistema;
+  if (!id) return;
+  const q = state.search ? `?q=${encodeURIComponent(state.search)}` : '';
+  try {
+    const r = await fetch(`/api/sistema/${id}${q}`);
+    const d = await r.json();
+    state.games = d.games;
+    renderGames(d);
+  } catch (ex) {
+    document.getElementById('content').innerHTML = `<div class="empty"><div class="icon">⚠️</div><div>Error: ${ex.message}</div></div>`;
+  }
+}
+
+function renderGames(d) {
+  const filtered = filterGames(state.games);
+  const total_local = state.games.filter(g => g.local).length;
+  const total_xbox  = state.games.filter(g => g.xbox).length;
+
+  document.getElementById('content').innerHTML = `
+    <div class="content-header">
+      <span style="font-size:24px">${d.icon}</span>
+      <div>
+        <div class="content-title">${d.label}</div>
+        <div class="content-meta">${d.total} juegos · ${d.total_size} · ${total_local} local · ${total_xbox} en Xbox</div>
+      </div>
+      <div class="spacer"></div>
+      <input class="search-box" type="text" placeholder="Buscar..." value="${state.search}"
+        oninput="onSearch(this.value)" id="searchInput">
+      <button class="btn btn-secondary btn-sm" onclick="refreshFtp('${d.sistema}')">🔄 Xbox</button>
+      <button class="btn btn-secondary btn-sm" onclick="scrapeCaratulas('${d.sistema}')" id="scrapeBtn_${d.sistema}" title="Descargar carátulas y subirlas al Xbox">🖼 Carátulas</button>
+      <button class="btn btn-primary btn-sm" onclick="downloadAll('${d.sistema}', false)">⬇ Bajar todo</button>
+      <button class="btn btn-primary btn-sm" onclick="downloadAll('${d.sistema}', true)">⬆ Bajar+Subir todo</button>
+    </div>
+    <div class="filters">
+      <span class="filter-btn ${state.filter==='all'?'active':''}" onclick="setFilter('all')">Todos (${d.total})</span>
+      <span class="filter-btn ${state.filter==='missing'?'active':''}" onclick="setFilter('missing')">Faltantes (${d.total - total_xbox})</span>
+      <span class="filter-btn ${state.filter==='local'?'active':''}" onclick="setFilter('local')">Local (${total_local})</span>
+      <span class="filter-btn ${state.filter==='xbox'?'active':''}" onclick="setFilter('xbox')">En Xbox (${total_xbox})</span>
+    </div>
+    <div id="thumbProgress_${d.sistema}" class="thumb-progress" style="display:none"></div>
+    <table class="games-table">
+      <thead><tr>
+        <th style="width:44px"></th>
+        <th>Juego</th>
+        <th>Tamaño</th>
+        <th>Estado</th>
+        <th>Acciones</th>
+      </tr></thead>
+      <tbody id="gamesBody">
+        ${renderRows(filtered, d.sistema)}
+      </tbody>
+    </table>
+    ${filtered.length === 0 ? '<div class="empty"><div class="icon">🔍</div><div>Sin resultados</div></div>' : ''}
+  `;
+}
+
+function renderRows(games, sistema) {
+  return games.map(g => {
+    const jobKey = Object.keys(state.jobs).find(k => k.startsWith(`${sistema}_${g.filename}_`));
+    const job = jobKey ? state.jobs[jobKey] : null;
+    const isActive = job && !['done','error'].includes(job.state);
+
+    const statusBadge = g.xbox
+      ? `<span class="badge badge-xbox">🎮 Xbox</span>`
+      : g.local
+        ? `<span class="badge badge-local">💾 Local</span>`
+        : `<span class="badge badge-none">—</span>`;
+
+    const progressRow = isActive ? `
+      <tr class="progress-row" id="prog_${jobKey}">
+        <td colspan="4">
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill ${job.state}" style="width:${job.progress}%"></div>
+          </div>
+          <div class="progress-info">
+            ${job.state === 'uploading' ? '⬆ Subiendo' : '⬇ Descargando'}
+            ${job.progress}% · ${fmtSize(job.speed)}/s · ETA ${fmtEta(job.eta)}
+          </div>
+        </td>
+      </tr>` : '';
+
+    const thumbUrl = `/api/thumb/${sistema}/${encodeURIComponent(g.name)}`;
+    return `
+      <tr id="row_${g.filename.replace(/[^a-z0-9]/gi,'_')}">
+        <td style="padding:4px 8px">
+          <img class="game-thumb" src="${thumbUrl}"
+            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+            alt="">
+          <div class="game-thumb-wrap" style="display:none">🎮</div>
+        </td>
+        <td class="game-name">${g.name}</td>
+        <td class="size-cell">${g.size_fmt}</td>
+        <td>${statusBadge}</td>
+        <td class="actions-cell">
+          ${!g.local ? `<button class="btn btn-secondary btn-sm" onclick="download('${sistema}','${escJs(g.filename)}',false)">⬇</button>` : ''}
+          ${g.local && !g.xbox ? `<button class="btn btn-primary btn-sm" onclick="download('${sistema}','${escJs(g.filename)}',true)">⬆ Xbox</button>` : ''}
+          ${!g.xbox ? `<button class="btn btn-primary btn-sm" onclick="download('${sistema}','${escJs(g.filename)}',true)">⬇⬆</button>` : ''}
+        </td>
+      </tr>${progressRow}`;
+  }).join('');
+}
+
+function filterGames(games) {
+  return games.filter(g => {
+    if (state.filter === 'local')   return g.local;
+    if (state.filter === 'xbox')    return g.xbox;
+    if (state.filter === 'missing') return !g.xbox;
+    return true;
+  });
+}
+
+// ── Acciones ──────────────────────────────────────────────────────────────────
+async function download(sistema, filename, upload) {
+  await fetch('/api/download', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sistema, filename, upload}),
+  });
+  toggleQueue(true);
+}
+
+async function downloadAll(sistema, upload) {
+  const r = await fetch('/api/download-all', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sistema, upload, only_missing: true}),
+  });
+  const d = await r.json();
+  showToast(`${d.queued} juegos en cola`);
+  toggleQueue(true);
+}
+
+async function scrapeCaratulas(sistema) {
+  const btn = document.getElementById(`scrapeBtn_${sistema}`);
+  if (btn) { btn.textContent = '⏳ Descargando...'; btn.disabled = true; }
+  const prog = document.getElementById(`thumbProgress_${sistema}`);
+  if (prog) prog.style.display = 'block';
+  await fetch(`/api/thumb-scrape/${sistema}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({upload: state.xboxOnline}),
+  });
+  showToast('Descarga de carátulas iniciada');
+}
+
+evtSource.addEventListener('thumb_progress', e => {
+  const d = JSON.parse(e.data);
+  const prog = document.getElementById(`thumbProgress_${d.sistema}`);
+  if (prog) prog.textContent = `🖼 Carátulas: ${d.ok} OK · ${d.fail} no encontradas · ${d.xbox_ok} en Xbox (${d.ok + d.fail}/${d.total})`;
+});
+
+evtSource.addEventListener('thumb_done', e => {
+  const d = JSON.parse(e.data);
+  const btn = document.getElementById(`scrapeBtn_${d.sistema}`);
+  if (btn) { btn.textContent = `🖼 Carátulas ✓${d.ok}`; btn.disabled = false; }
+  showToast(`🖼 ${d.ok} carátulas · ${d.xbox_ok} subidas al Xbox`);
+});
+
+async function refreshFtp(sistema) {
+  showToast('Actualizando lista Xbox...');
+  await fetch(`/api/ftp-refresh/${sistema}`);
+  await refreshGames(false);
+}
+
+function setFilter(f) {
+  state.filter = f;
+  refreshGames(false);
+}
+
+let searchTimeout;
+function onSearch(v) {
+  state.search = v;
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => refreshGames(false), 350);
+}
+
+// ── Cola ──────────────────────────────────────────────────────────────────────
+function toggleQueue(forceOpen) {
+  const p = document.getElementById('queuePanel');
+  const isOpen = p.classList.contains('open');
+  if (forceOpen === true || !isOpen) { p.classList.add('open'); renderQueue(); }
+  else p.classList.remove('open');
+}
+
+function renderQueue() {
+  const jobs = Object.values(state.jobs).sort((a,b) => {
+    const ord = {downloading:0, uploading:1, queued:2, done:3, error:4};
+    return (ord[a.state]??5) - (ord[b.state]??5);
+  });
+  document.getElementById('jobList').innerHTML = jobs.length === 0
+    ? '<div style="color:var(--text2);text-align:center;padding:30px">Sin trabajos</div>'
+    : jobs.map(j => `
+      <div class="job-item">
+        <div class="job-name">${j.filename || j.job_id}</div>
+        <div class="job-state">
+          <span>${j.sistema}</span>
+          <span>${j.state === 'downloading' ? '⬇ ' + j.progress + '%' :
+                  j.state === 'uploading'   ? '⬆ ' + j.progress + '%' :
+                  j.state === 'queued'      ? '⏳ En cola' :
+                  j.state === 'done'        ? '✓ Listo' : '✗ Error'}</span>
+        </div>
+        <div class="job-bar-wrap">
+          <div class="job-bar-fill ${j.state}" style="width:${j.state==='done'?100:j.progress}%"></div>
+        </div>
+        ${j.state === 'downloading' || j.state === 'uploading' ? `
+          <div style="font-size:10px;color:var(--text2);margin-top:3px">
+            ${fmtSize(j.speed)}/s · ETA ${fmtEta(j.eta)}
+          </div>` : ''}
+      </div>`).join('');
+}
+
+function updateJobUI(job) {
+  const progEl = document.getElementById(`prog_${job.job_id}`);
+  if (progEl) {
+    const bar = progEl.querySelector('.progress-bar-fill');
+    const info = progEl.querySelector('.progress-info');
+    if (bar) { bar.style.width = job.progress + '%'; bar.className = `progress-bar-fill ${job.state}`; }
+    if (info) info.textContent = `${job.state === 'uploading' ? '⬆ Subiendo' : '⬇ Descargando'} ${job.progress}% · ${fmtSize(job.speed)}/s · ETA ${fmtEta(job.eta)}`;
+  }
+  renderQueue();
+}
+
+function updateQueueBadge() {
+  const active = Object.values(state.jobs).filter(j => !['done','error'].includes(j.state));
+  const badge = document.getElementById('queueBadge');
+  badge.textContent = active.length;
+  badge.className = 'queue-badge' + (active.length > 0 ? ' visible' : '');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtSize(b) {
+  if (!b || b <= 0) return '--';
+  if (b >= 1073741824) return (b/1073741824).toFixed(1) + ' GB';
+  if (b >= 1048576)    return (b/1048576).toFixed(1) + ' MB';
+  if (b >= 1024)       return (b/1024).toFixed(0) + ' KB';
+  return b + ' B';
+}
+function fmtEta(s) {
+  if (!s || s < 0) return '--';
+  if (s >= 3600) return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+  if (s >= 60)   return Math.floor(s/60) + 'm ' + (s%60) + 's';
+  return s + 's';
+}
+function escJs(s) { return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+let toastTimeout;
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a22;border:1px solid #2e2e3e;color:#e2e2f0;padding:10px 18px;border-radius:8px;font-size:13px;z-index:999;transition:opacity 0.3s';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => t.style.opacity = '0', 2500);
+}
+
+// ── Búsqueda global ───────────────────────────────────────────────────────────
+let globalSearchTimeout;
+let indexedCount = 0;
+let indexTotal   = 0;
+
+evtSource.addEventListener('index_progress', e => {
+  const d = JSON.parse(e.data);
+  if (d.done) indexedCount++;
+  const pct = indexTotal > 0 ? Math.round(indexedCount / indexTotal * 100) : 0;
+  document.getElementById('indexBarFill').style.width = pct + '%';
+  document.getElementById('indexStatus').textContent = `Indexando... ${indexedCount}/${indexTotal}`;
+  if (indexedCount >= indexTotal && indexTotal > 0) {
+    document.getElementById('indexBar').classList.remove('visible');
+    document.getElementById('indexStatus').textContent = `✓ ${indexTotal} sistemas indexados`;
+    setTimeout(() => document.getElementById('indexStatus').textContent = '', 3000);
+  }
+});
+
+evtSource.addEventListener('index_done', () => {
+  document.getElementById('indexBar').classList.remove('visible');
+  document.getElementById('indexStatus').textContent = '';
+});
+
+function onGlobalFocus() {
+  if (indexedCount < 2) startIndexing();
+}
+
+async function startIndexing() {
+  document.getElementById('indexBar').classList.add('visible');
+  document.getElementById('indexStatus').textContent = 'Indexando sistemas...';
+  await fetch('/api/index-all');
+}
+
+function onGlobalSearch(val) {
+  clearTimeout(globalSearchTimeout);
+  const icon = document.getElementById('globalSearchIcon');
+  if (!val.trim()) {
+    icon.textContent = '🔍';
+    if (state.currentSistema) refreshGames(false); else renderHome();
+    return;
+  }
+  icon.textContent = '⏳';
+  globalSearchTimeout = setTimeout(() => runGlobalSearch(val), 300);
+}
+
+async function runGlobalSearch(q) {
+  if (q.length < 2) return;
+  document.getElementById('globalSearchIcon').textContent = '⏳';
+  const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+  const d = await r.json();
+  document.getElementById('globalSearchIcon').textContent = d.total > 0 ? '🔍' : '❌';
+  renderSearchResults(q, d);
+}
+
+function renderSearchResults(q, d) {
+  const content = document.getElementById('content');
+  if (!d.results || d.results.length === 0) {
+    content.innerHTML = `
+      <div class="empty">
+        <div class="icon">🔍</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:6px">Sin resultados para "${q}"</div>
+        <div style="color:var(--text2)">${d.sistemas_indexados} sistemas indexados de ${indexTotal}</div>
+        ${d.sistemas_indexados < indexTotal ? '<div style="color:var(--yellow);margin-top:8px">⚠ No todos los sistemas están indexados aún</div>' : ''}
+      </div>`;
+    return;
+  }
+
+  const porSistema = {};
+  for (const g of d.results) porSistema[g.sistema] = (porSistema[g.sistema] || 0) + 1;
+
+  content.innerHTML = `
+    <div style="margin-bottom:16px">
+      <div style="font-size:20px;font-weight:700;margin-bottom:4px">🔍 "${q}"</div>
+      <div style="color:var(--text2);font-size:13px">
+        ${d.total} resultado${d.total !== 1 ? 's' : ''} en ${Object.keys(porSistema).length} sistema${Object.keys(porSistema).length !== 1 ? 's' : ''}
+        · ${d.sistemas_indexados}/${indexTotal} sistemas indexados
+        ${d.total > 200 ? ' · <span style="color:var(--yellow)">mostrando primeros 200</span>' : ''}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+        ${Object.entries(porSistema).map(([sid, cnt]) => {
+          const meta = state.sistemas.find(s => s.id === sid) || {};
+          return `<span class="sys-badge" onclick="loadSistema('${sid}')" style="cursor:pointer" title="Ver ${meta.label || sid}">
+            ${meta.icon || '🎮'} ${meta.label || sid} <span style="color:var(--accent);margin-left:2px">${cnt}</span>
+          </span>`;
+        }).join('')}
+      </div>
+    </div>
+    <table class="games-table">
+      <thead><tr>
+        <th style="width:44px"></th>
+        <th>Juego</th>
+        <th>Sistema</th>
+        <th>Tamaño</th>
+        <th>Estado</th>
+        <th>Acciones</th>
+      </tr></thead>
+      <tbody>
+        ${d.results.map(g => {
+          const statusBadge = g.xbox
+            ? `<span class="badge badge-xbox">🎮 Xbox</span>`
+            : g.local
+              ? `<span class="badge badge-local">💾 Local</span>`
+              : `<span class="badge badge-none">—</span>`;
+          const tUrl = `/api/thumb/${g.sistema}/${encodeURIComponent(g.name)}`;
+          return `<tr>
+            <td style="padding:4px 8px">
+              <img class="game-thumb" src="${tUrl}"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="">
+              <div class="game-thumb-wrap" style="display:none">🎮</div>
+            </td>
+            <td class="game-name">${highlightMatch(g.name, q)}</td>
+            <td><span class="sys-badge" onclick="loadSistema('${g.sistema}')" style="cursor:pointer">${g.icon} ${g.label}</span></td>
+            <td class="size-cell">${g.size_fmt}</td>
+            <td>${statusBadge}</td>
+            <td class="actions-cell">
+              ${!g.xbox ? `<button class="btn btn-primary btn-sm" onclick="download('${g.sistema}','${escJs(g.filename)}',true)">⬇⬆</button>` : ''}
+              ${!g.local && !g.xbox ? `<button class="btn btn-secondary btn-sm" onclick="download('${g.sistema}','${escJs(g.filename)}',false)">⬇</button>` : ''}
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function highlightMatch(name, q) {
+  const idx = name.toLowerCase().indexOf(q.toLowerCase());
+  if (idx === -1) return name;
+  return name.slice(0, idx)
+    + `<mark style="background:rgba(230,162,60,0.3);color:var(--accent);border-radius:2px">${name.slice(idx, idx + q.length)}</mark>`
+    + name.slice(idx + q.length);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadSistemas();
+setTimeout(startIndexing, 2000);
+</script>
+</body>
+</html>
