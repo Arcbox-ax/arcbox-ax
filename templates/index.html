@@ -124,6 +124,15 @@
   .sys-mini-info { font-size: 11px; color: var(--text2); margin-top: 2px; }
   .sys-mini-badge { display: inline-block; margin-top: 4px; background: #1a3a2a; color: var(--green); font-size: 10px; padding: 1px 5px; border-radius: 6px; font-weight: 600; }
 
+  /* ── Top 10 home grid ── */
+  .top-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+  .top-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; overflow: hidden; transition: border-color 0.2s, transform 0.2s; }
+  .top-card:hover { border-color: var(--accent); transform: translateY(-3px); }
+  .top-card-thumb { width: 100%; aspect-ratio: 3/4; object-fit: cover; display: block; background: var(--bg3); }
+  .top-card-icon { width: 100%; aspect-ratio: 3/4; display: flex; align-items: center; justify-content: center; font-size: 48px; background: var(--bg3); }
+  .top-card-label { padding: 8px 10px 2px; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .top-card-count { padding: 0 10px 10px; font-size: 12px; color: var(--accent); font-weight: 700; }
+
   /* ── Content header ── */
   .content-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
   .content-title { font-size: 20px; font-weight: 700; }
@@ -243,6 +252,7 @@
   @media (max-width: 420px) {
     .games-table td, .games-table th { padding: 6px 8px; }
     .brand-card-systems.open { grid-template-columns: 1fr 1fr !important; }
+    .top-grid { grid-template-columns: 1fr 1fr; }
   }
 </style>
 </head>
@@ -468,7 +478,7 @@ const state = {
   search: '',
   jobs: {},
   xboxOnline: false,
-  openGroups: new Set(['nintendo','sega','atari','snk','arcade','sony','commodore','nec','bandai','sinclair','msx','pioneros','clasicospc']),
+  openGroups: new Set(),
 };
 
 // ── SSE ──────────────────────────────────────────────────────────────────────
@@ -555,42 +565,40 @@ function toggleGroup(id) {
 }
 
 function renderHome() {
-  const totalLocal = state.sistemas.filter(s => s.local_count > 0).length;
+  const withRoms = state.sistemas
+    .filter(s => s.local_count > 0)
+    .sort((a, b) => b.local_count - a.local_count)
+    .slice(0, 10);
+
+  if (withRoms.length === 0) {
+    document.getElementById('content').innerHTML = `
+      <div class="empty">
+        <div class="icon">🎮</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:6px">Bienvenido a ArcBOX-AX</div>
+        <div>Selecciona un sistema en el sidebar para empezar.</div>
+      </div>`;
+    return;
+  }
+
+  const totalLocal = withRoms.length;
   document.getElementById('content').innerHTML = `
     <div class="home-header">
-      <h2>Elige un sistema</h2>
+      <h2>Top sistemas</h2>
       <p>${state.sistemas.length} sistemas · <span style="color:var(--green)">${totalLocal} con descargas</span></p>
     </div>
-    ${GRUPOS.map(grupo => {
-      const sistemas = state.sistemas.filter(s => grupo.sistemas.includes(s.id));
-      if (!sistemas.length) return '';
-      const localCount = sistemas.reduce((a, s) => a + s.local_count, 0);
-      const isOpen = state.openGroups.has(grupo.id);
-      return `
-        <div class="brand-card">
-          <div class="brand-card-header" onclick="toggleGroup('${grupo.id}')">
-            <div class="brand-card-logo">${grupo.logo}</div>
-            <div>
-              <div class="brand-card-title">${grupo.label}</div>
-              <div class="brand-card-meta">${sistemas.length} sistema${sistemas.length !== 1 ? 's' : ''}${localCount > 0 ? ` · <span style="color:var(--green)">${localCount} en local</span>` : ''}</div>
-            </div>
-            <span class="brand-card-arrow ${isOpen ? 'open' : ''}">▶</span>
-          </div>
-          <div class="brand-card-systems ${isOpen ? 'open' : ''}">
-            ${sistemas.map(s => `
-              <div class="sys-mini-card" onclick="loadSistema('${s.id}')">
-                <span style="font-size:22px">${s.icon}</span>
-                <div>
-                  <div class="sys-mini-name">${s.label}</div>
-                  ${s.local_count > 0
-                    ? `<span class="sys-mini-badge">✓ ${s.local_count}</span>`
-                    : `<div class="sys-mini-info">Sin descargas</div>`}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>`;
-    }).join('')}`;
+    <div class="top-grid">
+      ${withRoms.map(s => `
+        <div class="top-card" onclick="loadSistema('${s.id}')">
+          <img class="top-card-thumb"
+            src="/api/thumb/${s.id}/${encodeURIComponent(s.id)}"
+            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+            alt="${s.label}">
+          <div class="top-card-icon" style="display:none">${s.icon}</div>
+          <div class="top-card-label">${s.label}</div>
+          <div class="top-card-count">${s.local_count} ROMs</div>
+        </div>
+      `).join('')}
+    </div>`;
 }
 
 function goHome() {
