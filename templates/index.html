@@ -305,7 +305,6 @@
 
 <div class="main">
   <div class="sidebar" id="sidebar">
-    <div class="sidebar-section">Sistemas</div>
     <div id="sidebarList"></div>
   </div>
 
@@ -589,9 +588,6 @@ function renderSidebar() {
         <div class="group-systems ${isOpen ? 'open' : ''}">
           ${sistemas.map(s => `
             <div class="sys-item ${state.currentSistema === s.id ? 'active' : ''}" onclick="loadSistema('${s.id}')">
-              ${SYSTEM_ICONS[s.id]
-                ? `<img src="${sysIconUrl(s.id)}" width="22" height="22" style="flex-shrink:0;object-fit:contain" onerror="this.style.display='none'">`
-                : `<span style="font-size:18px;width:24px;text-align:center;flex-shrink:0">${s.icon}</span>`}
               <span class="sys-label">${s.label}</span>
               ${s.local_count > 0 ? `<span class="sys-count has-items">${s.local_count}</span>` : ''}
             </div>
@@ -831,7 +827,9 @@ function renderGames(d) {
 
   document.getElementById('content').innerHTML = `
     <div class="content-header">
-      <span style="font-size:24px">${d.icon}</span>
+      ${SYSTEM_ICONS[d.sistema]
+        ? `<img src="${sysIconUrl(d.sistema)}" width="40" height="40" style="object-fit:contain" onerror="this.style.display='none'">`
+        : `<span style="font-size:24px">${d.icon}</span>`}
       <div>
         <div class="content-title">${d.label}</div>
         <div class="content-meta">${d.total} juegos · ${d.total_size} · ${total_local} local · ${total_xbox} en Xbox</div>
