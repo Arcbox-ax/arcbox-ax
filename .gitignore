@@ -5,3 +5,4 @@ __pycache__/
 roms-backup/
 *.log
 .cache/
+deploy.sh
