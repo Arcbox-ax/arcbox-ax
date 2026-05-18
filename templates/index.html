@@ -124,18 +124,23 @@
   .sys-mini-info { font-size: 11px; color: var(--text2); margin-top: 2px; }
   .sys-mini-badge { display: inline-block; margin-top: 4px; background: #1a3a2a; color: var(--green); font-size: 10px; padding: 1px 5px; border-radius: 6px; font-weight: 600; }
 
-  /* ── Top 10 home grid ── */
-  .top-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
-  .top-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; overflow: hidden; transition: border-color 0.2s, transform 0.2s; position: relative; }
-  .top-card:hover { border-color: var(--accent); transform: translateY(-3px); }
-  .top-card-thumb { width: 100%; aspect-ratio: 1/1; object-fit: contain; display: block; background: var(--bg3); padding: 10px; }
-  .top-card-icon { width: 100%; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; font-size: 48px; background: var(--bg3); }
-  .top-card-label { padding: 8px 10px 2px; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .top-card-count { padding: 0 10px 10px; font-size: 12px; color: var(--accent); font-weight: 700; }
-  .fav-btn { position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.55); border:none; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; z-index:2; padding:0; transition:background 0.15s; }
-  .fav-btn:hover { background:rgba(0,0,0,0.85); }
+  /* ── Home rows (Netflix style) ── */
   .section-title { font-size:12px; font-weight:700; color:var(--text2); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; }
-  .fav-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  .sys-row { margin-bottom:24px; }
+  .sys-row-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .sys-row-icon { width:32px; height:32px; object-fit:contain; flex-shrink:0; }
+  .sys-row-title { font-size:14px; font-weight:700; flex:1; }
+  .sys-row-meta { font-size:12px; color:var(--text2); white-space:nowrap; }
+  .sys-row-fav { background:none; border:none; cursor:pointer; font-size:14px; padding:0 2px; line-height:1; }
+  .sys-row-btn { background:none; border:none; cursor:pointer; font-size:12px; color:var(--accent2); padding:0 4px; white-space:nowrap; }
+  .sys-row-btn:hover { text-decoration:underline; }
+  .games-row { display:flex; gap:10px; overflow-x:auto; padding-bottom:8px; }
+  .games-row::-webkit-scrollbar { height:3px; }
+  .games-row::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+  .game-mini-card { flex:0 0 90px; cursor:pointer; }
+  .game-mini-card:hover .game-mini-thumb { border-color:var(--accent); }
+  .game-mini-thumb { width:90px; height:90px; object-fit:contain; background:var(--bg3); border-radius:6px; border:1px solid var(--border); display:block; transition:border-color 0.15s; }
+  .game-mini-name { font-size:10px; color:var(--text2); margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:90px; }
 
   /* ── Content header ── */
   .content-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -577,8 +582,9 @@ function renderSidebar() {
         <div class="group-systems ${isOpen ? 'open' : ''}">
           ${sistemas.map(s => `
             <div class="sys-item ${state.currentSistema === s.id ? 'active' : ''}" onclick="loadSistema('${s.id}')">
-              <img src="/api/thumb/${s.id}/${s.id}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;background:var(--bg2)" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">
-              <span class="sys-icon" style="display:none">${s.icon}</span>
+              ${sysIconUrl(s.id)
+                ? `<img src="${sysIconUrl(s.id)}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;background:var(--bg2)" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="sys-icon" style="display:none">${s.icon}</span>`
+                : `<span class="sys-icon">${s.icon}</span>`}
               <span class="sys-label">${s.label}</span>
               ${favIds.includes(s.id) ? '<span style="font-size:10px;opacity:0.8">⭐</span>' : ''}
               ${s.local_count > 0 ? `<span class="sys-count has-items">${s.local_count}</span>` : ''}
@@ -611,26 +617,8 @@ function toggleFavorite(id, event) {
   renderSidebar();
 }
 
-function renderTopCard(s, favIds) {
-  const iconUrl = sysIconUrl(s.id);
-  const isFav = favIds.includes(s.id);
-  return `
-    <div class="top-card" onclick="loadSistema('${s.id}')">
-      ${iconUrl
-        ? `<img class="top-card-thumb" src="${iconUrl}"
-               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
-               alt="${s.label}">`
-        : ''}
-      <div class="top-card-icon" style="${iconUrl ? 'display:none' : ''}">${s.icon}</div>
-      <button class="fav-btn" onclick="toggleFavorite('${s.id}',event)" title="Favorito">${isFav ? '⭐' : '☆'}</button>
-      <div class="top-card-label">${s.label}</div>
-      <div class="top-card-count">${s.local_count} ROMs</div>
-    </div>`;
-}
-
-function renderHome() {
+async function renderHome() {
   const favIds = getFavorites();
-  const favSystems = favIds.map(id => state.sistemas.find(s => s.id === id)).filter(Boolean);
   const withRoms = state.sistemas
     .filter(s => s.local_count > 0)
     .sort((a, b) => b.local_count - a.local_count)
@@ -647,25 +635,70 @@ function renderHome() {
   }
 
   const totalLocal = state.sistemas.filter(s => s.local_count > 0).length;
+  const favFirst = [
+    ...withRoms.filter(s => favIds.includes(s.id)),
+    ...withRoms.filter(s => !favIds.includes(s.id)),
+  ];
+
   document.getElementById('content').innerHTML = `
     <div class="home-header">
-      <h2>Top sistemas</h2>
+      <h2>Mis ROMs</h2>
       <p>${state.sistemas.length} sistemas · <span style="color:var(--green)">${totalLocal} con descargas</span></p>
     </div>
-    ${favSystems.length > 0 ? `
-      <div style="margin-bottom:28px">
-        <div class="section-title">⭐ Favoritos</div>
-        <div class="top-grid fav-grid">
-          ${favSystems.map(s => renderTopCard(s, favIds)).join('')}
-        </div>
+    <div id="homeRows"></div>`;
+
+  const rowsEl = document.getElementById('homeRows');
+  let shownFavTitle = false;
+  let shownTopTitle = false;
+
+  for (const s of favFirst) {
+    const isFav = favIds.includes(s.id);
+    if (isFav && !shownFavTitle) {
+      rowsEl.insertAdjacentHTML('beforeend', `<div class="section-title">⭐ Favoritos</div>`);
+      shownFavTitle = true;
+    }
+    if (!isFav && !shownTopTitle) {
+      rowsEl.insertAdjacentHTML('beforeend', `<div class="section-title" style="margin-top:${shownFavTitle?'24px':'0'}">Top sistemas</div>`);
+      shownTopTitle = true;
+    }
+    const iconUrl = sysIconUrl(s.id);
+    const row = document.createElement('div');
+    row.className = 'sys-row';
+    row.innerHTML = `
+      <div class="sys-row-header">
+        ${iconUrl
+          ? `<img class="sys-row-icon" src="${iconUrl}" onerror="this.style.display='none'" alt="">`
+          : `<span style="font-size:20px;width:32px;text-align:center;flex-shrink:0">${s.icon}</span>`}
+        <span class="sys-row-title">${s.label}</span>
+        <span class="sys-row-meta">${s.local_count} ROMs</span>
+        <button class="sys-row-fav" onclick="toggleFavorite('${s.id}',event)" title="Favorito">${isFav ? '⭐' : '☆'}</button>
+        <button class="sys-row-btn" onclick="loadSistema('${s.id}')">Ver todo →</button>
       </div>
-    ` : ''}
-    <div>
-      <div class="section-title">Top sistemas</div>
-      <div class="top-grid">
-        ${withRoms.map(s => renderTopCard(s, favIds)).join('')}
-      </div>
-    </div>`;
+      <div class="games-row" id="row_games_${s.id}">
+        <span style="color:var(--text2);font-size:12px;padding:10px 0">Cargando...</span>
+      </div>`;
+    rowsEl.appendChild(row);
+    loadRowGames(s.id);
+  }
+}
+
+async function loadRowGames(sysId) {
+  try {
+    const r = await fetch(`/api/sistema/${sysId}`);
+    const d = await r.json();
+    const games = d.games.filter(g => g.local).slice(0, 15);
+    const el = document.getElementById(`row_games_${sysId}`);
+    if (!el) return;
+    if (!games.length) { el.innerHTML = ''; return; }
+    el.innerHTML = games.map(g => `
+      <div class="game-mini-card" onclick="loadSistema('${sysId}')">
+        <img class="game-mini-thumb"
+          src="/api/thumb/${sysId}/${encodeURIComponent(g.name)}"
+          onerror="this.style.opacity='0'"
+          alt="">
+        <div class="game-mini-name" title="${g.name}">${g.name}</div>
+      </div>`).join('');
+  } catch {}
 }
 
 function goHome() {
