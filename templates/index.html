@@ -128,8 +128,8 @@
   .top-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
   .top-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; overflow: hidden; transition: border-color 0.2s, transform 0.2s; }
   .top-card:hover { border-color: var(--accent); transform: translateY(-3px); }
-  .top-card-thumb { width: 100%; aspect-ratio: 3/4; object-fit: cover; display: block; background: var(--bg3); }
-  .top-card-icon { width: 100%; aspect-ratio: 3/4; display: flex; align-items: center; justify-content: center; font-size: 48px; background: var(--bg3); }
+  .top-card-thumb { width: 100%; aspect-ratio: 1/1; object-fit: contain; display: block; background: var(--bg3); padding: 10px; }
+  .top-card-icon { width: 100%; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; font-size: 48px; background: var(--bg3); }
   .top-card-label { padding: 8px 10px 2px; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .top-card-count { padding: 0 10px 10px; font-size: 12px; color: var(--accent); font-weight: 700; }
 
@@ -469,6 +469,31 @@ const GRUPOS = [
   },
 ];
 
+// ── System icons (KyleBing/retro-game-console-icons) ─────────────────────────
+const SYSTEM_ICONS = {
+  nes:'fc', fds:'fds', satellaview:'satella', snes:'sfc', n64:'n64',
+  gba:'gba', gb:'gb', gbc:'gbc', nds:'nds', virtualboy:'vb', pokemini:'poke',
+  sg1000:'segasgone', mastersystem:'ms', gamegear:'gg', megadrive:'md',
+  sega32x:'32X', segacd:'segacd', dreamcast:'dc',
+  atari2600:'atari', atari5200:'5200', atari7800:'7800', atari800:'atari800',
+  atarist:'atarist', lynx:'lynx',
+  neogeo:'neogeo', neogeocd:'neocd', ngp:'ngp', ngpc:'ngpc',
+  arcade:'arcade', mame:'mame', fbneo:'arcade',
+  psx:'ps', psp:'psp',
+  c64:'c64', amiga:'amiga', amigacd32:'amiga',
+  pce:'pce', pcecd:'pcecd',
+  odyssey2:'ody', channelf:'fairchild', colecovision:'col',
+  intellivision:'itv', vectrex:'vectrex', supervision:'supervision',
+  wonderswan:'ws',
+  zxspectrum:'zxs', msx1:'msx', msx2:'msx',
+  scummvm:'scummvm', dos:'dos', amstrad:'cpc', x68000:'x68000',
+};
+const ICONS_BASE = 'https://raw.githubusercontent.com/KyleBing/retro-game-console-icons/main/series_miyoo/264w@2x';
+function sysIconUrl(id) {
+  const n = SYSTEM_ICONS[id];
+  return n ? `${ICONS_BASE}/${n}@264.png` : null;
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 const state = {
   sistemas: [],
@@ -587,17 +612,20 @@ function renderHome() {
       <p>${state.sistemas.length} sistemas · <span style="color:var(--green)">${totalLocal} con descargas</span></p>
     </div>
     <div class="top-grid">
-      ${withRoms.map(s => `
+      ${withRoms.map(s => {
+        const iconUrl = sysIconUrl(s.id);
+        return `
         <div class="top-card" onclick="loadSistema('${s.id}')">
-          <img class="top-card-thumb"
-            src="/api/thumb/${s.id}/${encodeURIComponent(s.id)}"
-            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
-            alt="${s.label}">
-          <div class="top-card-icon" style="display:none">${s.icon}</div>
+          ${iconUrl
+            ? `<img class="top-card-thumb" src="${iconUrl}"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+                 alt="${s.label}">`
+            : ''}
+          <div class="top-card-icon" style="${iconUrl ? 'display:none' : ''}">${s.icon}</div>
           <div class="top-card-label">${s.label}</div>
           <div class="top-card-count">${s.local_count} ROMs</div>
-        </div>
-      `).join('')}
+        </div>`;
+      }).join('')}
     </div>`;
 }
 
