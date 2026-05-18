@@ -1,12 +1,14 @@
 # CLAUDE.md — ArcBOX-AX
 
 App web Flask para gestionar ROMs del Xbox Series S vía FTP. Corre en `http://localhost:5000`.
+Repo: https://github.com/Arcbox-ax/arcbox-ax
 
 ## Archivos
 
 ```
 kalita-app/
 ├── app.py               — backend Flask: rutas API, FTP, descarga, thumb scraping
+├── deploy.sh            — script local (en .gitignore): commit + push + restart
 ├── templates/
 │   └── index.html       — frontend SPA completo (CSS + HTML + JS en un archivo)
 └── .gitignore
@@ -17,11 +19,11 @@ No hay requirements.txt. Dependencias: `flask`, stdlib (`ftplib`, `threading`, `
 ## Iniciar la app
 
 ```bash
-python3 app.py
-# Si el puerto 5000 está ocupado:
-fuser -k 5000/tcp && python3 app.py
-# En background:
-nohup python3 app.py > /tmp/kalita-app.log 2>&1 &
+# Script local (commit + push + restart):
+~/xbox/kalita-app/deploy.sh "mensaje de commit"
+
+# Solo restart (Flask debug=False, requiere restart para ver cambios en templates):
+fuser -k 5000/tcp && cd ~/xbox/kalita-app && nohup python3 app.py > /tmp/kalita-app.log 2>&1 &
 ```
 
 ## Configuración (app.py, líneas ~13-24)
@@ -78,34 +80,83 @@ ftp_cache       # ftp_dir → set de filenames
 
 ## Arquitectura frontend (index.html)
 
-SPA vanilla JS, sin frameworks.
+SPA vanilla JS, sin frameworks. Todo el CSS, HTML y JS en un solo archivo.
 
 ### Estructura JS
 
 ```
 GRUPOS[]          — grupos por marca con logos SVG (Nintendo, Sega, Sony, etc.)
-SISTEMAS_META{}   — (viene del backend via /api/sistemas)
+SYSTEM_ICONS{}    — mapeo sistema ID → nombre icono KyleBing (40+ sistemas)
+sysIconUrl(id)    — URL raw GitHub de KyleBing/retro-game-console-icons (264w@2x)
 state{}           — currentSistema, games, filter, search, jobs, xboxOnline, openGroups
 ```
+
+`state.openGroups` inicia como `new Set()` — todos los grupos del sidebar contraídos al inicio.
+
+### Home — "Mis ROMs"
+
+Layout Netflix: filas por sistema con scroll horizontal de miniaturas.
+
+- **❤️ Favoritos** — sección arriba si hay ROMs marcados con corazón
+- **Top sistemas** — top 10 por `local_count`, cada fila carga sus juegos via `loadRowGames(id)`
+- Iconos de consola desde `SYSTEM_ICONS` → raw.githubusercontent.com (KyleBing/retro-game-console-icons)
+- Cada miniatura: imagen `/api/thumb/<sistema>/<name>` + botón corazón + nombre truncado
+
+### Favoritos de ROMs
+
+```js
+localStorage key: 'arcbox_favorites'  // array de {sistema, filename, name}
+getRomFavs()                          // lee y filtra solo objetos válidos
+isRomFav(sistema, filename)
+toggleRomFav(sistema, filename, name, heartEl)
+handleHeartClick(event, el)           // lee data attrs del .game-mini-card padre
+```
+
+### Popup hover
+
+- Elemento único `#rom-popup` en el DOM (position:fixed, z-index:500)
+- Aparece 300ms después del mouseenter sobre miniatura o thumbnail de tabla
+- Muestra: imagen grande + nombre completo + sistema + tamaño + botones ⬇/📤
+- `showRomPopup(event, el)` lee `el.dataset.*` para los datos
+- `hideRomPopup()` con delay 120ms (permite mover el mouse al popup sin que se cierre)
+- `downloadFromPopup(upload)` usa `popup.dataset.sistema/filename`
 
 ### Funciones principales
 
 | Función | Descripción |
 |---------|-------------|
-| `loadSistemas()` | Carga sidebar + home con brand cards |
-| `loadSistema(id)` | Carga juegos de un sistema |
-| `renderSidebar()` | Renderiza grupos colapsables |
-| `renderHome()` | Renderiza brand cards en el contenido |
+| `loadSistemas()` | Carga sidebar + home |
+| `loadSistema(id)` | Carga vista de juegos de un sistema |
+| `renderSidebar()` | Grupos colapsables con emoji del sistema |
+| `renderHome()` | async — sección favoritos + filas Netflix |
+| `loadRowGames(sysId)` | async — carga juegos locales de una fila |
 | `renderGames(data)` | Tabla de juegos con estado local/Xbox |
-| `download(sistema, filename, upload)` | Inicia descarga de un ROM |
+| `renderRows(games, sistema)` | Filas de tabla con popup hover y botones |
+| `download(sistema, filename, upload)` | Inicia descarga/subida de un ROM |
 | `downloadAll(sistema, upload)` | Descarga todos los faltantes |
 | `toggleSidebar()` | Abre/cierra sidebar en mobile |
 | `onGlobalSearch(q)` | Búsqueda global con debounce |
-| `connectSSE()` | Conecta a `/api/events` para progreso en tiempo real |
+
+### Botones en tabla de juegos
+
+- **⬇ Local** — azul (`--accent2`), llama `download(..., false)`. Si ya local: `✓ Local` disabled.
+- **📤 Xbox** — naranja (`--accent`), llama `download(..., true)`. Si ya en Xbox: `✓ Xbox` disabled.
 
 ### Sidebar grupos (GRUPOS array)
+
 Cada grupo tiene `id`, `label`, `sistemas[]` y `logo` (SVG inline).
-Grupos definidos: Nintendo, Sega, Atari, SNK, Arcade, Sony, Commodore, NEC, Pioneros, Bandai, Sinclair, MSX, Clásicos PC.
+Grupos: Nintendo, Sega, Atari, SNK, Arcade, Sony, Commodore, NEC, Pioneros, Bandai, Sinclair, MSX, Clásicos PC.
+Cada sistema muestra su emoji (`s.icon`) de 18px a la izquierda del nombre.
+
+### Helpers JS
+
+```js
+esc(s)       // HTML-escapa para uso en atributos (& → &amp;, " → &quot;)
+escJs(s)     // escapa para strings inline en onclick (\\ y ')
+fmtSize(b)   // bytes → KB/MB/GB
+fmtEta(s)    // segundos → m s / h m
+showToast(msg)
+```
 
 ## Logo ArcBOX-AX
 
@@ -127,6 +178,7 @@ SVG inline en `<h1>`, viewBox 80×36, fondo `#0f0f13`, borde `#2e2e3e`.
 --accent2: #5b8dee  /* azul — acción secundaria */
 --green: #4ade80
 --red: #f87171
+--yellow: #fbbf24
 --text: #e2e2f0
 --text2: #8888aa    /* texto secundario */
 ```
@@ -141,6 +193,8 @@ SVG inline en `<h1>`, viewBox 80×36, fondo `#0f0f13`, borde `#2e2e3e`.
 
 ## Convenciones
 
-- Al agregar un sistema nuevo: añadir en `SISTEMAS_META` (app.py) y en el grupo correspondiente dentro de `GRUPOS` (index.html)
-- CSS en `index.html` usa sentinel comments implícitos por sección — mantener el orden: header → layout → sidebar → content → table → queue → mobile
-- SSE se reconecta automáticamente si se pierde la conexión
+- Al agregar un sistema nuevo: añadir en `SISTEMAS_META` (app.py), en `GRUPOS` (index.html) y en `SYSTEM_ICONS` (index.html) si tiene icono KyleBing
+- CSS en `index.html` organizado por sección: header → layout → sidebar → home rows → content → table → queue → mobile → popup
+- SSE (`/api/events`) maneja eventos: `progress`, `done`, `queued`, `thumb_progress`, `thumb_done`, `index_progress`, `index_done`
+- `data-*` attributes en `.game-mini-card` y wrapper de thumb en tabla: `sistema`, `name`, `filename`, `size`, `local`, `xbox`
+- Usar siempre `esc()` para HTML attributes e `escJs()` para inline JS cuando se insertan strings de usuario
