@@ -239,6 +239,7 @@ download_status = {}   # job_id → {name, sistema, progress, speed, eta, state}
 sse_clients     = []
 jsonl_cache     = {}   # sistema → list of entries
 ftp_cache       = {}   # ftp_dir → set of filenames
+_rp_last_sync   = {}   # sistema → timestamp del último auto-sync pedido (debounce)
 _ftp_cache_ts   = {}
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -511,6 +512,11 @@ def _process_job(job):
             download_status[job_id].update({"state": "error"})
             sse_broadcast("progress", {"job_id": job_id, **download_status[job_id]})
             return
+        threading.Thread(
+            target=_retropass_auto_sync,
+            args=(sistema, ftp_dir, nombre),
+            daemon=True,
+        ).start()
 
     download_status[job_id].update({"state": "done", "progress": 100})
     sse_broadcast("progress", {"job_id": job_id, **download_status[job_id]})
@@ -864,6 +870,49 @@ def api_config_route():
     return jsonify(config)
 
 # ─── RetroPass Sync ───────────────────────────────────────────────────────────
+
+def _retropass_auto_sync(sistema, ftp_dir, filename):
+    """Debounced: espera 3s, cancela si llegó otro upload del mismo sistema."""
+    ts = time.time()
+    _rp_last_sync[sistema] = ts
+    time.sleep(3)
+    if _rp_last_sync.get(sistema) != ts:
+        return
+
+    ftp_cache.pop(ftp_dir, None)
+    xbox_files = ftp_list_dir(ftp_dir)
+    if not xbox_files:
+        return
+
+    xml_bytes = _retropass_build_gamelist(sistema, xbox_files)
+    ftp = None
+    thumbs_ok = 0
+    try:
+        ftp = ftp_connect()
+        ftp.storbinary(f"STOR {ftp_dir}/gamelist.xml", io.BytesIO(xml_bytes))
+        # Subir carátula del ROM recién subido si ya está descargada
+        stem        = thumb_game_name(Path(filename).stem)
+        local_thumb = THUMB_DIR / sistema / (stem + ".png")
+        if local_thumb.exists():
+            media_dir = f"{ftp_dir}/media/box-front"
+            for d in [f"{ftp_dir}/media", media_dir]:
+                try: ftp.mkd(d)
+                except Exception: pass
+            with open(local_thumb, "rb") as f:
+                ftp.storbinary(f"STOR {media_dir}/{stem}.png", f)
+            thumbs_ok = 1
+        sse_broadcast("retropass_done", {
+            "sistema": sistema, "roms": len(xbox_files), "thumbs_ok": thumbs_ok, "thumbs_fail": 0,
+        })
+    except Exception:
+        pass
+    finally:
+        try:
+            if ftp: ftp.quit()
+        except Exception:
+            try:
+                if ftp: ftp.close()
+            except Exception: pass
 
 def _retropass_build_gamelist(sistema, xbox_files):
     try:
