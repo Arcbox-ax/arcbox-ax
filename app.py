@@ -39,6 +39,19 @@ def load_config():
         except Exception:
             pass
 
+COMMENTS_FILE = BASE_DIR / ".arcbox_comments.json"
+
+def load_comments():
+    global comments_cache
+    if COMMENTS_FILE.exists():
+        try:
+            comments_cache = json.loads(COMMENTS_FILE.read_text())
+        except Exception:
+            comments_cache = {}
+
+def save_comments():
+    COMMENTS_FILE.write_text(json.dumps(comments_cache, ensure_ascii=False, indent=2))
+
 LIBRETRO_SYSTEM = {
     "scummvm":      "ScummVM",
     "psx":          "Sony - PlayStation",
@@ -240,6 +253,7 @@ sse_clients     = []
 jsonl_cache     = {}   # sistema → list of entries
 ftp_cache       = {}   # ftp_dir → set of filenames
 _rp_last_sync   = {}   # sistema → timestamp del último auto-sync pedido (debounce)
+comments_cache  = {}   # sistema → {filename → text}
 _ftp_cache_ts   = {}
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -849,6 +863,29 @@ def api_events():
     return Response(stream_with_context(stream()), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
+# ─── Comments API ─────────────────────────────────────────────────────────────
+
+@app.route("/api/comments", methods=["GET", "POST"])
+def api_comments():
+    if request.method == "POST":
+        data     = request.json or {}
+        sistema  = data.get("sistema", "").strip()
+        filename = data.get("filename", "").strip()
+        text     = data.get("text", "").strip()
+        if not sistema or not filename:
+            return jsonify({"error": "sistema y filename requeridos"}), 400
+        if sistema not in comments_cache:
+            comments_cache[sistema] = {}
+        if text:
+            comments_cache[sistema][filename] = text
+        else:
+            comments_cache[sistema].pop(filename, None)
+            if not comments_cache[sistema]:
+                del comments_cache[sistema]
+        save_comments()
+        return jsonify({"ok": True})
+    return jsonify(comments_cache)
+
 # ─── Config API ───────────────────────────────────────────────────────────────
 
 @app.route("/api/config", methods=["GET", "POST"])
@@ -919,18 +956,20 @@ def _retropass_build_gamelist(sistema, xbox_files):
         entries = cargar_jsonl(sistema)
     except Exception:
         entries = []
-    name_map = {e["n"] + get_ext(e): e["n"] for e in entries}
+    name_map     = {e["n"] + get_ext(e): e["n"] for e in entries}
+    sys_comments = comments_cache.get(sistema, {})
     lines = ['<?xml version="1.0"?>', '<gameList>']
     for fname in sorted(xbox_files):
-        name = xml_esc(name_map.get(fname, Path(fname).stem))
-        img  = xml_esc(thumb_game_name(Path(fname).stem) + ".png")
-        lines += [
-            '  <game>',
-            f'    <path>./{xml_esc(fname)}</path>',
-            f'    <name>{name}</name>',
-            f'    <image>./media/box-front/{img}</image>',
-            '  </game>',
-        ]
+        name    = xml_esc(name_map.get(fname, Path(fname).stem))
+        img     = xml_esc(thumb_game_name(Path(fname).stem) + ".png")
+        comment = sys_comments.get(fname, "")
+        lines  += ['  <game>',
+                   f'    <path>./{xml_esc(fname)}</path>',
+                   f'    <name>{name}</name>',
+                   f'    <image>./media/box-front/{img}</image>']
+        if comment:
+            lines.append(f'    <desc>{xml_esc(comment)}</desc>')
+        lines.append('  </game>')
     lines.append('</gameList>')
     return '\n'.join(lines).encode('utf-8')
 
@@ -1012,6 +1051,7 @@ if __name__ == "__main__":
     BASE_DIR.mkdir(parents=True, exist_ok=True)
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     load_config()
+    load_comments()
     print(f"╔══════════════════════════════════════════╗")
     print(f"║  ArcBOX-AX  →  http://localhost:{config['webui_port']}    ║")
     print(f"╚══════════════════════════════════════════╝")

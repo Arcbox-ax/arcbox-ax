@@ -594,6 +594,7 @@ const state = {
   jobs: {},
   xboxOnline: false,
   openGroups: new Set(),
+  comments: {},
 };
 
 // ── SSE ──────────────────────────────────────────────────────────────────────
@@ -709,6 +710,63 @@ function handleHeartClick(event, el) {
   toggleRomFav(card.dataset.sistema, card.dataset.filename, card.dataset.name, el);
 }
 
+// ── Comentarios ───────────────────────────────────────────────────────────────
+async function loadComments() {
+  try {
+    const r = await fetch('/api/comments');
+    state.comments = await r.json();
+  } catch {}
+}
+
+function getComment(sistema, filename) {
+  return (state.comments[sistema] || {})[filename] || '';
+}
+
+function toggleCommentRow(sistema, filename) {
+  const safeId  = (sistema + '_' + filename).replace(/[^a-z0-9]/gi, '_');
+  const rowId   = 'cmt_row_' + safeId;
+  const existing = document.getElementById(rowId);
+  if (existing) { existing.remove(); return; }
+  const gameRow = document.getElementById('row_' + filename.replace(/[^a-z0-9]/gi, '_'));
+  if (!gameRow) return;
+  const comment = getComment(sistema, filename);
+  const tr = document.createElement('tr');
+  tr.id = rowId;
+  tr.innerHTML = `<td colspan="6" style="padding:2px 12px 12px">
+    <textarea id="cmt_ta_${safeId}"
+      placeholder="Agrega una nota sobre este juego..."
+      style="width:100%;background:var(--bg3);border:1px solid var(--accent);color:var(--text);
+             padding:8px 10px;border-radius:6px;font-size:12px;resize:vertical;
+             min-height:58px;outline:none;font-family:inherit;line-height:1.5"
+      onblur="saveComment('${escJs(sistema)}','${escJs(filename)}',this.value)"
+      onkeydown="if(event.key==='Escape')this.blur()"
+    >${esc(comment)}</textarea></td>`;
+  gameRow.insertAdjacentElement('afterend', tr);
+  document.getElementById('cmt_ta_' + safeId)?.focus();
+}
+
+async function saveComment(sistema, filename, text) {
+  text = text.trim();
+  if (!state.comments[sistema]) state.comments[sistema] = {};
+  if (text) state.comments[sistema][filename] = text;
+  else {
+    delete state.comments[sistema][filename];
+    if (!Object.keys(state.comments[sistema]).length) delete state.comments[sistema];
+  }
+  // Actualizar color del botón 💬
+  const safeId = (sistema + '_' + filename).replace(/[^a-z0-9]/gi, '_');
+  const btn = document.querySelector(`[data-cmt="${safeId}"]`);
+  if (btn) {
+    btn.style.color       = text ? 'var(--accent)' : 'var(--text2)';
+    btn.style.borderColor = text ? 'var(--accent)' : 'var(--border)';
+    btn.title = text ? 'Ver/editar nota' : 'Agregar nota';
+  }
+  await fetch('/api/comments', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sistema, filename, text}),
+  });
+}
+
 let popupTimeout;
 
 function getSistemaLabel(id) {
@@ -724,11 +782,13 @@ function showRomPopup(event, el) {
     popup.dataset.sistema = sistema;
     popup.dataset.filename = filename;
     const thumbUrl = `/api/thumb/${sistema}/${encodeURIComponent(name)}`;
+    const comment  = getComment(sistema, filename);
     popup.innerHTML = `
       <img class="popup-img" src="${thumbUrl}" onerror="this.style.opacity='0.1'" alt="">
       <div class="popup-body">
         <div class="popup-name">${name}</div>
         <div class="popup-meta">${getSistemaLabel(sistema)} · ${size || '--'}</div>
+        ${comment ? `<div style="font-size:11px;color:var(--text2);border-top:1px solid var(--border);margin-top:8px;padding-top:8px;line-height:1.5">${comment}</div>` : ''}
         <div class="popup-actions">
           ${local === 'true'
             ? `<button class="btn btn-sm" style="background:var(--bg3);border:1px solid var(--border);color:var(--green);flex:1" disabled>✓ Local</button>`
@@ -943,9 +1003,11 @@ function renderGames(d) {
 
 function renderRows(games, sistema) {
   return games.map(g => {
-    const jobKey = Object.keys(state.jobs).find(k => k.startsWith(`${sistema}_${g.filename}_`));
-    const job = jobKey ? state.jobs[jobKey] : null;
-    const isActive = job && !['done','error'].includes(job.state);
+    const jobKey    = Object.keys(state.jobs).find(k => k.startsWith(`${sistema}_${g.filename}_`));
+    const job       = jobKey ? state.jobs[jobKey] : null;
+    const isActive  = job && !['done','error'].includes(job.state);
+    const hasComment = !!getComment(sistema, g.filename);
+    const safeId    = (sistema + '_' + g.filename).replace(/[^a-z0-9]/gi, '_');
 
     const statusBadge = g.xbox
       ? `<span style="color:var(--green);font-size:12px;white-space:nowrap">✓ En Xbox</span>`
@@ -1000,6 +1062,11 @@ function renderRows(games, sistema) {
           ${g.local
             ? `<a class="btn btn-sm" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);text-decoration:none" href="/api/rom-file/${sistema}/${encodeURIComponent(g.filename)}" download="${esc(g.filename)}">💾 PC</a>`
             : ''}
+          <button class="btn btn-sm"
+            data-cmt="${safeId}"
+            onclick="toggleCommentRow('${escJs(sistema)}','${escJs(g.filename)}')"
+            style="background:var(--bg3);border:1px solid ${hasComment ? 'var(--accent)' : 'var(--border)'};color:${hasComment ? 'var(--accent)' : 'var(--text2)'}"
+            title="${hasComment ? 'Ver/editar nota' : 'Agregar nota'}">💬</button>
         </td>
       </tr>${progressRow}`;
   }).join('');
@@ -1406,6 +1473,7 @@ function highlightMatch(name, q) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadSistemas();
+loadComments();
 setTimeout(startIndexing, 2000);
 </script>
 <div id="rom-popup" onmouseenter="clearTimeout(popupTimeout)" onmouseleave="hideRomPopup()"></div>
