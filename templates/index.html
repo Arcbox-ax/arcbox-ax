@@ -252,6 +252,7 @@
     .btn-sm { padding: 4px 7px; font-size: 11px; }
 
     .queue-panel { width: 100%; border-left: none; border-top: 1px solid var(--border); top: auto; }
+    .settings-panel { width: 100%; border-left: none; border-top: 1px solid var(--border); top: auto; }
 
     .brand-card-systems.open { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important; }
 
@@ -265,6 +266,18 @@
     .brand-card-systems.open { grid-template-columns: 1fr 1fr !important; }
     .top-grid { grid-template-columns: 1fr 1fr; }
   }
+
+  /* ── Settings panel ── */
+  .settings-panel { position:fixed; right:0; top:0; bottom:0; width:340px; background:var(--bg2); border-left:1px solid var(--border); overflow-y:auto; padding:16px; z-index:101; transform:translateX(100%); transition:transform 0.25s; }
+  .settings-panel.open { transform:translateX(0); }
+  .settings-section { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--text2); margin:18px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+  .settings-field { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+  .settings-field label { font-size:11px; color:var(--text2); }
+  .settings-field input { background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:7px 10px; border-radius:var(--radius); font-size:13px; outline:none; width:100%; }
+  .settings-field input:focus { border-color:var(--accent); }
+  .settings-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
+  .cfg-status { font-size:11px; margin-top:6px; min-height:14px; }
+  .retropass-status { font-size:11px; color:var(--text2); margin-top:8px; min-height:14px; line-height:1.5; }
 
   /* ── ROM popup ── */
   #rom-popup { position:fixed; z-index:500; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); box-shadow:0 8px 32px rgba(0,0,0,0.75); width:220px; overflow:hidden; display:none; }
@@ -298,6 +311,7 @@
   </div>
   <span id="indexStatus" style="font-size:11px;color:var(--text2);white-space:nowrap"></span>
   <button class="header-btn" onclick="goHome()">🏠 Sistemas</button>
+  <button class="header-btn" onclick="toggleSettings()" title="Configuración">⚙</button>
   <button class="header-btn" onclick="toggleQueue()">📋 Cola</button>
 </header>
 <div class="index-bar" id="indexBar"><div class="index-bar-fill" id="indexBarFill" style="width:0%"></div></div>
@@ -320,6 +334,66 @@
     <span class="queue-close" onclick="toggleQueue()">✕</span>
   </div>
   <div id="jobList"></div>
+</div>
+
+<!-- Settings Panel -->
+<div class="settings-panel" id="settingsPanel">
+  <div class="queue-title">
+    ⚙ Configuración
+    <span class="queue-close" onclick="toggleSettings()">✕</span>
+  </div>
+
+  <div class="settings-section">📡 Xbox FTP</div>
+  <div class="settings-field">
+    <label>IP del Xbox</label>
+    <input type="text" id="cfg_xbox_ip" placeholder="192.168.1.51">
+  </div>
+  <div style="display:flex;gap:8px">
+    <div class="settings-field" style="flex:1">
+      <label>Puerto</label>
+      <input type="number" id="cfg_xbox_port" placeholder="21">
+    </div>
+    <div class="settings-field" style="flex:1">
+      <label>Usuario</label>
+      <input type="text" id="cfg_xbox_user" placeholder="ftp">
+    </div>
+  </div>
+  <div class="settings-field">
+    <label>Contraseña</label>
+    <input type="password" id="cfg_xbox_pass" placeholder="ftp">
+  </div>
+  <div class="settings-actions">
+    <button class="btn btn-primary btn-sm" onclick="saveConfig()">💾 Guardar</button>
+    <button class="btn btn-secondary btn-sm" onclick="testFtp()">🔗 Probar</button>
+  </div>
+  <div class="cfg-status" id="cfgFtpStatus"></div>
+
+  <div class="settings-section">🎮 RetroPass</div>
+  <p style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.6">
+    Genera <code style="background:var(--bg3);padding:1px 4px;border-radius:3px">gamelist.xml</code>
+    y sube carátulas al Xbox para que RetroPass las lea automáticamente.
+  </p>
+  <div class="settings-actions" style="flex-direction:column;gap:6px">
+    <button class="btn btn-secondary btn-sm" id="rpSyncBtn" onclick="syncRetroPass(false)">🔄 Sync sistema actual</button>
+    <button class="btn btn-secondary btn-sm" onclick="syncRetroPass(true)">⬆ Sync todos los sistemas</button>
+  </div>
+  <div class="retropass-status" id="retropassStatus"></div>
+
+  <div class="settings-section">🌐 WebUI</div>
+  <div style="display:flex;gap:8px">
+    <div class="settings-field" style="flex:1">
+      <label>Puerto</label>
+      <input type="number" id="cfg_webui_port" placeholder="5000">
+    </div>
+    <div class="settings-field" style="flex:2">
+      <label>Host</label>
+      <input type="text" id="cfg_webui_host" placeholder="0.0.0.0">
+    </div>
+  </div>
+  <div class="settings-actions">
+    <button class="btn btn-primary btn-sm" onclick="saveConfig()">💾 Guardar</button>
+  </div>
+  <p style="font-size:11px;color:var(--yellow);margin-top:8px">⚠ Cambios en WebUI requieren reiniciar la app</p>
 </div>
 
 <script>
@@ -1012,6 +1086,115 @@ function toggleQueue(forceOpen) {
   if (forceOpen === true || !isOpen) { p.classList.add('open'); renderQueue(); }
   else p.classList.remove('open');
 }
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+function toggleSettings() {
+  const p = document.getElementById('settingsPanel');
+  const q = document.getElementById('queuePanel');
+  if (p.classList.contains('open')) {
+    p.classList.remove('open');
+  } else {
+    q.classList.remove('open');
+    p.classList.add('open');
+    loadConfig();
+    updateRpSyncBtn();
+  }
+}
+
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/config');
+    const d = await r.json();
+    document.getElementById('cfg_xbox_ip').value    = d.xbox_ip    ?? '';
+    document.getElementById('cfg_xbox_port').value  = d.xbox_port  ?? 21;
+    document.getElementById('cfg_xbox_user').value  = d.xbox_user  ?? '';
+    document.getElementById('cfg_xbox_pass').value  = d.xbox_pass  ?? '';
+    document.getElementById('cfg_webui_port').value = d.webui_port ?? 5000;
+    document.getElementById('cfg_webui_host').value = d.webui_host ?? '0.0.0.0';
+  } catch {}
+}
+
+async function saveConfig() {
+  const body = {
+    xbox_ip:    document.getElementById('cfg_xbox_ip').value.trim(),
+    xbox_port:  parseInt(document.getElementById('cfg_xbox_port').value) || 21,
+    xbox_user:  document.getElementById('cfg_xbox_user').value.trim(),
+    xbox_pass:  document.getElementById('cfg_xbox_pass').value,
+    webui_port: parseInt(document.getElementById('cfg_webui_port').value) || 5000,
+    webui_host: document.getElementById('cfg_webui_host').value.trim(),
+  };
+  try {
+    const r = await fetch('/api/config', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (d.ok) { showToast('✓ Configuración guardada'); pollStatus(); }
+  } catch { showToast('✗ Error guardando config'); }
+}
+
+async function testFtp() {
+  const el = document.getElementById('cfgFtpStatus');
+  el.textContent = '🔄 Probando...'; el.style.color = 'var(--text2)';
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    el.textContent = d.xbox_online ? '✓ Xbox conectado' : '✗ No se puede conectar';
+    el.style.color = d.xbox_online ? 'var(--green)' : 'var(--red)';
+  } catch { el.textContent = '✗ Error'; el.style.color = 'var(--red)'; }
+}
+
+function updateRpSyncBtn() {
+  const btn = document.getElementById('rpSyncBtn');
+  if (!btn) return;
+  if (state.currentSistema) {
+    const meta = state.sistemas.find(s => s.id === state.currentSistema);
+    btn.textContent = `🔄 Sync ${meta ? meta.label : state.currentSistema}`;
+    btn.disabled = false;
+  } else {
+    btn.textContent = '🔄 Sync sistema actual';
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+  }
+}
+
+async function syncRetroPass(all) {
+  const status = document.getElementById('retropassStatus');
+  if (all) {
+    status.textContent = '⏳ Iniciando sync de todos los sistemas...';
+    status.style.color = 'var(--text2)';
+    await fetch('/api/retropass-sync-all', {method: 'POST'});
+  } else {
+    if (!state.currentSistema) { showToast('Selecciona un sistema primero'); return; }
+    status.textContent = `⏳ Sincronizando ${state.currentSistema}...`;
+    status.style.color = 'var(--text2)';
+    const r = await fetch(`/api/retropass-sync/${state.currentSistema}`, {method: 'POST'});
+    const d = await r.json();
+    if (d.skipped) { status.textContent = '⚠ No hay ROMs de este sistema en el Xbox aún'; }
+  }
+}
+
+evtSource.addEventListener('retropass_progress', e => {
+  const d = JSON.parse(e.data);
+  const el = document.getElementById('retropassStatus');
+  if (el) {
+    el.textContent = `🔄 ${d.sistema}: ${d.thumbs_ok + d.thumbs_fail}/${d.total} carátulas`;
+    el.style.color = 'var(--text2)';
+  }
+});
+
+evtSource.addEventListener('retropass_done', e => {
+  const d = JSON.parse(e.data);
+  const el = document.getElementById('retropassStatus');
+  if (d.error) {
+    if (el) { el.textContent = `✗ ${d.sistema}: ${d.error}`; el.style.color = 'var(--red)'; }
+    showToast(`✗ RetroPass sync fallido: ${d.sistema}`);
+  } else {
+    const msg = `✓ ${d.sistema}: ${d.roms} ROMs · ${d.thumbs_ok} carátulas subidas`;
+    if (el) { el.textContent = msg; el.style.color = 'var(--green)'; }
+    showToast(msg);
+  }
+});
 
 function renderQueue() {
   const jobs = Object.values(state.jobs).sort((a,b) => {

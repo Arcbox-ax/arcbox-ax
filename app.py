@@ -4,7 +4,7 @@ ArcBOX-AX — Interfaz web para gestionar ROMs del Xbox
 Corre en http://localhost:5000
 """
 
-import json, ftplib, threading, time, urllib.request, urllib.error, queue, os, re
+import json, ftplib, threading, time, urllib.request, urllib.error, queue, os, re, io
 from pathlib import Path
 from flask import Flask, render_template, jsonify, request, Response, stream_with_context, send_file
 
@@ -12,16 +12,32 @@ app = Flask(__name__)
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
-XBOX_IP   = "192.168.1.51"
-XBOX_PORT = 21
-XBOX_USER = "ftp"
-XBOX_PASS = "ftp"
-BASE_DIR  = Path.home() / "roms-backup"
+config = {
+    "xbox_ip":    "192.168.1.51",
+    "xbox_port":  21,
+    "xbox_user":  "ftp",
+    "xbox_pass":  "ftp",
+    "webui_host": "0.0.0.0",
+    "webui_port": 5000,
+}
+
+BASE_DIR     = Path.home() / "roms-backup"
+CONFIG_FILE  = BASE_DIR / ".arcbox_config.json"
 JSONL_BASE   = "https://raw.githubusercontent.com/Arley4d/roms/main/{}.jsonl"
 MAME_URL_TPL = "https://archive.org/download/mame-roms-split/MAME%20ROMs%20%28split%29/{}.zip"
 CACHE_DIR    = BASE_DIR / ".cache"
 THUMB_DIR    = BASE_DIR / ".thumbs"
 THUMB_BASE   = "https://raw.githubusercontent.com/libretro-thumbnails/{system}/master/Named_Boxarts/{game}.png"
+
+def load_config():
+    if CONFIG_FILE.exists():
+        try:
+            saved = json.loads(CONFIG_FILE.read_text())
+            for k in config:
+                if k in saved:
+                    config[k] = type(config[k])(saved[k])
+        except Exception:
+            pass
 
 LIBRETRO_SYSTEM = {
     "scummvm":      "ScummVM",
@@ -234,6 +250,9 @@ def fmt_size(b):
     if b >= 1024:    return f"{b/1024:.1f} KB"
     return f"{b} B"
 
+def xml_esc(s):
+    return str(s).replace('&','&amp;').replace('<','&lt;').replace('>','&gt;').replace('"','&quot;')
+
 def get_url(e):
     try: return e["urls"][0]["u"]
     except: return None
@@ -335,8 +354,8 @@ def cargar_jsonl(sistema):
 
 def ftp_connect():
     ftp = ftplib.FTP()
-    ftp.connect(XBOX_IP, XBOX_PORT, timeout=10)
-    ftp.login(XBOX_USER, XBOX_PASS)
+    ftp.connect(config["xbox_ip"], config["xbox_port"], timeout=10)
+    ftp.login(config["xbox_user"], config["xbox_pass"])
     ftp.set_pasv(True)
     return ftp
 
@@ -365,7 +384,10 @@ def ftp_list_dir(ftp_dir):
 def ftp_status():
     try:
         ftp = ftp_connect()
-        ftp.quit()
+        try:
+            ftp.quit()
+        except Exception:
+            ftp.close()
         return True
     except Exception:
         return False
@@ -821,10 +843,127 @@ def api_events():
     return Response(stream_with_context(stream()), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
+# ─── Config API ───────────────────────────────────────────────────────────────
+
+@app.route("/api/config", methods=["GET", "POST"])
+def api_config_route():
+    if request.method == "POST":
+        data = request.json or {}
+        for k in ("xbox_ip", "xbox_user", "xbox_pass", "webui_host"):
+            if k in data:
+                config[k] = str(data[k])
+        for k in ("xbox_port", "webui_port"):
+            if k in data:
+                try: config[k] = int(data[k])
+                except (ValueError, TypeError): pass
+        ftp_cache.clear()
+        _ftp_cache_ts.clear()
+        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        CONFIG_FILE.write_text(json.dumps(config, indent=2))
+        return jsonify({"ok": True})
+    return jsonify(config)
+
+# ─── RetroPass Sync ───────────────────────────────────────────────────────────
+
+def _retropass_build_gamelist(sistema, xbox_files):
+    try:
+        entries = cargar_jsonl(sistema)
+    except Exception:
+        entries = []
+    name_map = {e["n"] + get_ext(e): e["n"] for e in entries}
+    lines = ['<?xml version="1.0"?>', '<gameList>']
+    for fname in sorted(xbox_files):
+        name = xml_esc(name_map.get(fname, Path(fname).stem))
+        img  = xml_esc(thumb_game_name(Path(fname).stem) + ".png")
+        lines += [
+            '  <game>',
+            f'    <path>./{xml_esc(fname)}</path>',
+            f'    <name>{name}</name>',
+            f'    <image>./media/box-front/{img}</image>',
+            '  </game>',
+        ]
+    lines.append('</gameList>')
+    return '\n'.join(lines).encode('utf-8')
+
+def _retropass_sync_thread(sistema, xbox_files, xml_bytes):
+    ftp     = None
+    ftp_dir = SISTEMAS_META[sistema]["ftp"]
+    try:
+        ftp = ftp_connect()
+        ftp.storbinary(f"STOR {ftp_dir}/gamelist.xml", io.BytesIO(xml_bytes))
+
+        media_dir = f"{ftp_dir}/media/box-front"
+        for d in [f"{ftp_dir}/media", media_dir]:
+            try: ftp.mkd(d)
+            except Exception: pass
+
+        ok = fail = 0
+        for fname in xbox_files:
+            stem        = thumb_game_name(Path(fname).stem)
+            local_thumb = THUMB_DIR / sistema / (stem + ".png")
+            if local_thumb.exists():
+                try:
+                    with open(local_thumb, "rb") as f:
+                        ftp.storbinary(f"STOR {media_dir}/{stem}.png", f)
+                    ok += 1
+                except Exception:
+                    fail += 1
+            sse_broadcast("retropass_progress", {
+                "sistema": sistema, "total": len(xbox_files),
+                "thumbs_ok": ok, "thumbs_fail": fail,
+            })
+
+        sse_broadcast("retropass_done", {
+            "sistema": sistema, "roms": len(xbox_files),
+            "thumbs_ok": ok, "thumbs_fail": fail,
+        })
+    except Exception as ex:
+        sse_broadcast("retropass_done", {"sistema": sistema, "error": str(ex)})
+    finally:
+        try:
+            if ftp: ftp.quit()
+        except Exception:
+            try:
+                if ftp: ftp.close()
+            except Exception: pass
+
+@app.route("/api/retropass-sync/<sistema>", methods=["POST"])
+def api_retropass_sync(sistema):
+    if sistema not in SISTEMAS_META:
+        return jsonify({"error": "Sistema no encontrado"}), 404
+    xbox_files = ftp_list_dir(SISTEMAS_META[sistema]["ftp"])
+    if not xbox_files:
+        return jsonify({"ok": True, "roms": 0, "skipped": True})
+    xml_bytes = _retropass_build_gamelist(sistema, xbox_files)
+    threading.Thread(
+        target=_retropass_sync_thread,
+        args=(sistema, xbox_files, xml_bytes),
+        daemon=True,
+    ).start()
+    return jsonify({"ok": True, "roms": len(xbox_files)})
+
+@app.route("/api/retropass-sync-all", methods=["POST"])
+def api_retropass_sync_all():
+    def _all():
+        for sid in SISTEMAS_META:
+            local_path = BASE_DIR / sid
+            if not local_path.exists() or not any(local_path.iterdir()):
+                continue
+            xbox_files = ftp_list_dir(SISTEMAS_META[sid]["ftp"])
+            if not xbox_files:
+                continue
+            xml_bytes = _retropass_build_gamelist(sid, xbox_files)
+            _retropass_sync_thread(sid, xbox_files, xml_bytes)
+    threading.Thread(target=_all, daemon=True).start()
+    return jsonify({"ok": True})
+
+# ──────────────────────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
     BASE_DIR.mkdir(parents=True, exist_ok=True)
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    load_config()
     print(f"╔══════════════════════════════════════════╗")
-    print(f"║  kalita-app  →  http://localhost:5000    ║")
+    print(f"║  ArcBOX-AX  →  http://localhost:{config['webui_port']}    ║")
     print(f"╚══════════════════════════════════════════╝")
-    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
+    app.run(host=config["webui_host"], port=config["webui_port"], debug=False, threaded=True)
