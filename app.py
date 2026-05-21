@@ -347,11 +347,15 @@ def ftp_list_dir(ftp_dir):
         ftp = ftp_connect()
         items = []
         ftp.dir(ftp_dir, items.append)
-        ftp.quit()
+        try:
+            ftp.quit()
+        except Exception:
+            ftp.close()
         names = set()
         for line in items:
             parts = line.split()
-            if parts: names.add(parts[-1])
+            if len(parts) >= 9:
+                names.add(' '.join(parts[8:]))
         ftp_cache[ftp_dir] = names
         _ftp_cache_ts[ftp_dir] = time.time()
         return names
@@ -374,6 +378,10 @@ def ftp_upload(local_path, remote_dir, size_bytes, job_id):
 
     try:
         ftp = ftp_connect()
+        try:
+            ftp.mkd(remote_dir)
+        except Exception:
+            pass  # la carpeta ya existe
         with open(local_path, "rb") as f:
             def callback(data):
                 nonlocal enviado
@@ -399,7 +407,10 @@ def ftp_upload(local_path, remote_dir, size_bytes, job_id):
     finally:
         try:
             if ftp: ftp.quit()
-        except Exception: pass
+        except Exception:
+            try:
+                if ftp: ftp.close()
+            except Exception: pass
 
 # ─── Worker de descarga ────────────────────────────────────────────────────────
 
@@ -474,7 +485,10 @@ def _process_job(job):
     if upload:
         download_status[job_id].update({"state": "uploading", "progress": 0, "transferred": 0})
         sse_broadcast("progress", {"job_id": job_id, **download_status[job_id]})
-        ftp_upload(dest, ftp_dir, sz, job_id)
+        if not ftp_upload(dest, ftp_dir, sz, job_id):
+            download_status[job_id].update({"state": "error"})
+            sse_broadcast("progress", {"job_id": job_id, **download_status[job_id]})
+            return
 
     download_status[job_id].update({"state": "done", "progress": 100})
     sse_broadcast("progress", {"job_id": job_id, **download_status[job_id]})
@@ -705,6 +719,19 @@ def api_thumb(sistema, rom_name):
     if dest:
         return send_file(dest, mimetype="image/png")
     return Response(status=404)
+
+@app.route("/api/rom-file/<sistema>/<path:filename>")
+def api_rom_file(sistema, filename):
+    if sistema not in SISTEMAS_META:
+        return jsonify({"error": "Sistema no encontrado"}), 404
+    file_path = (BASE_DIR / sistema / filename).resolve()
+    try:
+        file_path.relative_to(BASE_DIR.resolve())
+    except ValueError:
+        return jsonify({"error": "Ruta inválida"}), 400
+    if not file_path.exists():
+        return jsonify({"error": "Archivo no encontrado"}), 404
+    return send_file(str(file_path), as_attachment=True, download_name=filename)
 
 @app.route("/api/thumb-scrape/<sistema>", methods=["POST"])
 def api_thumb_scrape(sistema):
